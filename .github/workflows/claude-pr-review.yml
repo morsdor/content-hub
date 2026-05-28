@@ -1,0 +1,56 @@
+name: claude-pr-review
+
+# Fires on every PR targeting develop — not on develop→main promotion PRs.
+# Claude posts a structured review comment; a human then reviews + approves.
+on:
+  pull_request:
+    branches: [develop]
+    types: [opened, synchronize, reopened]
+
+jobs:
+  review:
+    name: Claude PR review
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write         # needed to post the review comment
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0           # full history so Claude can see what actually changed
+
+      - uses: anthropics/claude-code-action@beta
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          direct_prompt: |
+            Review this pull request against the ContentHub project conventions in CLAUDE.md.
+
+            Check each concern below and reply with ✅ (looks good), ⚠️ (worth discussing), or
+            ❌ (must fix before merge). Be concise — one sentence per concern plus a code pointer
+            if there is a specific line to fix.
+
+            1. **Module boundaries (ADR-0009)** — no cross-module DB access; each module queries
+               only its own tables. Any JPA repository or JDBC call that touches another module's
+               schema is a hard ❌.
+
+            2. **Transactional outbox (ADR-0006)** — all Kafka events written via the outbox table
+               in the same DB transaction as the domain row. Any `KafkaTemplate.send()` call outside
+               the outbox relay is a hard ❌ (dual-write risk).
+
+            3. **Idempotent consumers** — every `@KafkaListener` method must be safe to call twice
+               with the same event. Look for upserts, `ON CONFLICT DO NOTHING`, or explicit event-id
+               deduplication. Missing idempotency is ⚠️ if low-risk, ❌ if it could corrupt data.
+
+            4. **No prod config in code** — connection strings, secrets, and env-specific values
+               must come from Spring profiles / environment variables only. Any hardcoded URL, key,
+               or credential is ❌.
+
+            5. **Test coverage** — new domain logic should have unit tests; new integrations should
+               have at least one integration test (Testcontainers). Flag large untested additions as ⚠️.
+
+            6. **Security** — no SQL injection exposure (parameterized queries only), no secrets
+               logged, no user-controlled input passed to shell commands, input validated at system
+               boundaries only (not deep in domain). Flag anything suspicious as ❌.
+
+            End with a one-line overall verdict: APPROVE / REQUEST_CHANGES / COMMENT.

@@ -68,11 +68,11 @@ services:
       - zookeeper_data:/var/lib/zookeeper/data
       - zookeeper_log:/var/lib/zookeeper/log
     healthcheck:
-      test: ["CMD-SHELL", "echo ruok | nc localhost 2181 | grep imok"]
+      test: ["CMD-SHELL", "python3 -c \"import socket,sys; s=socket.socket(); s.settimeout(2); s.connect(('localhost',2181)); s.sendall(b'ruok'); r=s.recv(10); s.close(); sys.exit(0 if r==b'imok' else 1)\""]
       interval: 10s
       timeout: 5s
-      retries: 5
-      start_period: 10s
+      retries: 10
+      start_period: 30s
     restart: unless-stopped
 
   kafka:
@@ -182,7 +182,7 @@ services:
 
   # One-shot: creates the S3 buckets the app expects. Idempotent (2>/dev/null || true).
   localstack-init:
-    image: amazon/aws-cli:2
+    image: amazon/aws-cli
     depends_on:
       localstack:
         condition: service_healthy
