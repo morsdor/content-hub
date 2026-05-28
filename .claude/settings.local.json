@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(mkdir -p /tmp/pages_extract)",
-      "Bash(unzip -o -q \"ContetHub - master plan.pages\" -d /tmp/pages_extract)"
+      "Bash(unzip -o -q \"ContetHub - master plan.pages\" -d /tmp/pages_extract)",
+      "Bash(docker compose *)",
+      "Skill(update-config)"
     ]
   }
 }

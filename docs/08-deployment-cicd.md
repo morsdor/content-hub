@@ -41,11 +41,11 @@ Stages, in order, with a fail-fast principle (cheapest checks first):
 | **Architecture tests** | ArchUnit | module boundaries intact ([ADR-0009](./03-adr/0009-modular-monolith-first.md)) |
 | Unit tests | JUnit5, Vitest | logic correctness ([`10`](./10-testing-qa.md)) |
 | Secret scan | gitleaks | no secrets in diff ([`06`](./06-security-architecture.md)) |
-| SCA (deps) | Dependabot/Trivy | no known-vuln dependencies |
-| SAST | CodeQL | no injected vuln patterns |
-| Build | Gradle, Vite | compiles, bundles |
-| **Contract tests** | Pact | REST/event contracts honored ([`05`](./05-api-and-event-contracts.md)) |
-| **Schema compat** | Schema Registry check | no breaking Kafka schema change ([`05` §7](./05-api-and-event-contracts.md)) |
+| SCA (deps) | **Snyk OSS** | no known-CVE dependencies; blocks on High/Critical ([`06`](./06-security-architecture.md)) |
+| SAST + quality gate | **SonarCloud** | code smells, coverage threshold, no injected vuln patterns |
+| Build | Maven, Vite | compiles, bundles |
+| **Contract tests** | **Spring Cloud Contract** (service↔service) + **Pact** (frontend↔API) | REST/event contracts honored ([`05`](./05-api-and-event-contracts.md)) |
+| **Schema compat** | Confluent Schema Registry Maven plugin | no breaking Kafka schema change ([`05` §7](./05-api-and-event-contracts.md)) |
 | Integration | Testcontainers | real PG/Mongo/Kafka behavior ([`10`](./10-testing-qa.md)) |
 | Image build + scan | Buildpacks/Docker, Trivy | image has no critical CVEs |
 | Publish | ECR | push image by **digest** + Helm chart by version |
@@ -59,17 +59,53 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }                                       # SonarCloud needs full history
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: '21' }
-      - run: ./gradlew spotlessCheck archTest test jacocoTestReport   # style + boundaries + unit
-      - run: ./gradlew pactVerify                                     # consumer contracts (05)
-      - run: ./gradlew integrationTest                               # Testcontainers PG/Mongo/Kafka
-      - uses: aquasecurity/trivy-action@master                       # image CVE scan
-        with: { image-ref: '${{ env.IMAGE }}' }
-      # publish only on main, by immutable digest:
+
+      # ── Quality: style, architecture boundaries, unit tests, coverage ──
+      - run: mvn spotless:check                                        # Spotless lint
+      - run: mvn test -P arch-test                                     # ArchUnit module boundaries
+      - run: mvn test jacocoTestReport                                 # unit + coverage report
+
+      # ── Security: SCA (deps) ──────────────────────────────────────────
+      - uses: snyk/actions/maven@master
+        env: { SNYK_TOKEN: '${{ secrets.SNYK_TOKEN }}' }
+        with: { args: --severity-threshold=high }                      # block on High/Critical CVEs
+
+      # ── Quality gate: SonarCloud ─────────────────────────────────────
+      - uses: SonarSource/sonarcloud-github-action@master
+        env:
+          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          SONAR_TOKEN:  '${{ secrets.SONAR_TOKEN }}'
+
+      # ── Contracts ────────────────────────────────────────────────────
+      - run: mvn spring-cloud-contract:generateTests verify -P contract  # Spring Cloud Contract (svc↔svc)
+      - run: mvn pact:verify                                             # Pact (frontend↔API)
+      - run: mvn schema-registry:validate                               # Kafka schema compat check
+
+      # ── Integration (Testcontainers spins up real PG/Mongo/Kafka) ────
+      - run: mvn verify -P integration
+
+      # ── Image build + CVE scan ────────────────────────────────────────
+      - run: mvn spring-boot:build-image -Dspring-boot.build-image.imageName=$ECR/$SVC:$GIT_SHA
+      - uses: aquasecurity/trivy-action@master
+        with: { image-ref: '${{ env.ECR }}/${{ env.SVC }}:${{ env.GIT_SHA }}' }
+
+      # ── Publish (main only, by immutable digest) ─────────────────────
       - if: github.ref == 'refs/heads/main'
-        run: ./gradlew bootBuildImage --imageName=$ECR/$SVC:$GIT_SHA && docker push $ECR/$SVC:$GIT_SHA
+        run: docker push $ECR/$SVC:$GIT_SHA
 ```
+
+> **SonarCloud vs CodeQL:** SonarCloud is the primary quality + security gate here (coverage
+> enforcement, code smells, Java-specific vuln patterns). GitHub's CodeQL can be enabled as a
+> complementary SAST for deeper security analysis — it runs in a separate workflow and is free for
+> public repos. Both are non-blocking suggestions in PR reviews; only SonarCloud enforces a Quality
+> Gate that can fail the build.
+>
+> **Snyk vs Dependabot:** Snyk is the CI gate (blocks merges with High/Critical CVEs). Dependabot
+> runs separately as an automated PR bot that keeps dependency versions current — they serve
+> different jobs and run simultaneously.
 
 > **Why contract tests and schema-compat checks are CI gates, not afterthoughts:** in a microservices
 > system the most dangerous bug is the *silent* contract break — Service A removes a field Service B
@@ -100,6 +136,77 @@ ArgoCD notices and rolls it out.
   (pairs with Terraform drift detection in [`07`](./07-infrastructure-terraform.md)).
 - **CI needs no cluster credentials** — it only writes to Git; ArgoCD (inside the cluster) pulls. One
   fewer powerful credential to leak.
+
+### 3.1 Repo structure — one monorepo or two?
+
+The GitOps pattern requires separating *app source* from *deploy state*. Two options:
+
+| Pattern | Structure | Recommendation |
+| --- | --- | --- |
+| **Two repos** (enterprise standard) | `content-hub/` (code) + `content-hub-deploy/` (Helm values per env) | Clean separation, independent history, harder to link a code change to its deploy |
+| **Monorepo with deploy path** | `content-hub/infra/deploy/envs/{qa,prod}/` lives in the same repo | One PR shows code change + the resulting deploy config bump together — better for a solo build |
+
+**This project uses the monorepo approach.** ArgoCD watches `infra/deploy/envs/prod/` in this
+same repo. The bot that bumps the image digest opens a PR against this repo (not a separate one),
+so the audit trail is: one PR = the code change + its deploy config in one place.
+
+```
+content-hub/
+├── backend/                    ← Spring Boot source (this repo)
+├── frontend/                   ← React source (this repo)
+├── infra/
+│   ├── local/                  ← docker-compose configs (local dev, $0)
+│   ├── modules/                ← Terraform modules (VPC, EKS, RDS, MSK…)
+│   ├── envs/
+│   │   ├── qa/                 ← ephemeral; terraform apply/destroy
+│   │   └── prod/               ← always-on; prevent_destroy on data stores
+│   └── deploy/
+│       ├── qa/values.yaml      ← image digests + config for QA   ← ArgoCD watches this
+│       └── prod/values.yaml    ← image digests + config for prod  ← ArgoCD watches this
+└── helm/
+    └── contenthub/             ← Helm chart templates (shared across envs)
+```
+
+### 3.2 Where does ArgoCD run?
+
+**ArgoCD runs as pods inside your EKS cluster** — it is not a separate server, not a SaaS, and
+not something you pay for independently.
+
+```
+ ┌──────────────────────────── EKS Cluster ───────────────────────────────┐
+ │                                                                          │
+ │   ┌─── argocd namespace ─────────────────────────────────────────────┐  │
+ │   │  argocd-server     (UI + API)                                     │  │
+ │   │  argocd-repo-server (clones + renders Helm charts from Git)       │  │
+ │   │  application-controller  (reconciles desired → actual state)      │  │
+ │   └───────────────────────────────────────────────────────────────────┘  │
+ │                                                                          │
+ │   ┌─── contenthub namespace ───────────────────────────────────────────┐ │
+ │   │  app pods (what ArgoCD manages)                                    │ │
+ │   └────────────────────────────────────────────────────────────────────┘ │
+ └──────────────────────────────────────────────────────────────────────────┘
+          │  pulls from Git (outbound only)
+          ▼
+ content-hub repo  ──  infra/deploy/prod/values.yaml
+```
+
+**How it gets there:** ArgoCD is installed into the cluster once via Terraform (a Helm release in
+[`07-infrastructure-terraform.md`](./07-infrastructure-terraform.md)):
+
+```hcl
+resource "helm_release" "argocd" {
+  name       = "argocd"
+  repository = "https://argoproj.github.io/argo-helm"
+  chart      = "argo-cd"
+  namespace  = "argocd"
+  # values: repo URL, RBAC, SSO with Cognito
+}
+```
+
+After that, ArgoCD is self-managing — it can even update itself via a GitOps `Application` that
+points at its own Helm values. Cost is just the Fargate pod-seconds for ~6 lightweight pods (cents
+per hour). For the local and ephemeral-QA environments ArgoCD is **not used** — you run the app
+directly (`make run`) or deploy via the Helm chart directly in the ephemeral stack.
 
 ---
 

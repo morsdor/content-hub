@@ -1,0 +1,72 @@
+# ── Environment ──────────────────────────────────────────────────────────────
+.env.local
+.env.*.local
+
+# ── Java / Maven ─────────────────────────────────────────────────────────────
+target/
+*.class
+*.jar
+*.war
+*.ear
+.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+# ── Java / Gradle ─────────────────────────────────────────────────────────────
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# ── Spring Boot ───────────────────────────────────────────────────────────────
+spring-shell.log
+
+# ── Node / npm / pnpm / Yarn ──────────────────────────────────────────────────
+node_modules/
+.npm/
+.pnp
+.pnp.js
+dist/
+.next/
+.nuxt/
+.cache/
+
+# ── IDE ───────────────────────────────────────────────────────────────────────
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# ── OS ────────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+ehthumbs.db
+
+# ── Terraform ─────────────────────────────────────────────────────────────────
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+.terraform.lock.hcl
+
+# ── Logs & temp ───────────────────────────────────────────────────────────────
+*.log
+logs/
+tmp/
+temp/
+
+# ── Test outputs ──────────────────────────────────────────────────────────────
+surefire-reports/
+failsafe-reports/
+test-results/
+coverage/
+.nyc_output/
+
+# ── Docker ────────────────────────────────────────────────────────────────────
+.docker/
