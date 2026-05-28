@@ -1,0 +1,27 @@
+# Prometheus scrape configuration — local dev
+# Dashboards are in Grafana at http://localhost:3001
+
+global:
+  scrape_interval:     15s
+  evaluation_interval: 15s
+
+scrape_configs:
+
+  # OTel Collector self-metrics (pipeline throughput, queue sizes, memory)
+  - job_name: otel-collector
+    static_configs:
+      - targets: ['otel-collector:8889']
+
+  # ContentHub Spring Boot app (Micrometer → /actuator/prometheus)
+  # host.docker.internal resolves on Docker Desktop (Mac/Windows).
+  # On Linux the compose file adds extra_hosts: host.docker.internal → host-gateway.
+  - job_name: contenthub-app
+    static_configs:
+      - targets: ['host.docker.internal:8080']
+    metrics_path: /actuator/prometheus
+    scrape_interval: 10s
+
+  # Prometheus self-metrics
+  - job_name: prometheus
+    static_configs:
+      - targets: ['localhost:9090']

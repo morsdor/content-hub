@@ -1,0 +1,317 @@
+# ContentHub local development stack
+# Emulates every AWS dependency locally — zero cloud cost for the inner dev loop.
+# See docs/12-cost-and-local-dev.md for the full rationale and workflow.
+#
+# Usage:
+#   make dev-up        start everything
+#   make dev-down      stop (data preserved)
+#   make clean-force   stop + wipe all volumes
+#   make logs          tail all logs
+
+services:
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # DATA TIER
+  # PostgreSQL: users, workspaces, cards, scripts, media, EDLs, billing, outbox
+  # MongoDB:    transcripts (word-timed), platform metrics payloads
+  # ────────────────────────────────────────────────────────────────────────────
+
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    environment:
+      POSTGRES_USER:     ${POSTGRES_USER:-contenthub}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-contenthub}
+      POSTGRES_DB:       ${POSTGRES_DB:-contenthub}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-contenthub}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+  mongo:
+    image: mongo:7.0
+    ports:
+      - "${MONGO_PORT:-27017}:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:-contenthub}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:-contenthub}
+      MONGO_INITDB_DATABASE:      ${MONGO_DB:-contenthub}
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --quiet --eval 'db.adminCommand(\"ping\").ok'"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 15s
+    restart: unless-stopped
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # MESSAGE BROKER  (Confluent Kafka — local stand-in for Amazon MSK)
+  # Topics declared explicitly; auto-creation disabled to prevent drift.
+  # ────────────────────────────────────────────────────────────────────────────
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.1
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME:   2000
+    volumes:
+      - zookeeper_data:/var/lib/zookeeper/data
+      - zookeeper_log:/var/lib/zookeeper/log
+    healthcheck:
+      test: ["CMD-SHELL", "echo ruok | nc localhost 2181 | grep imok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  kafka:
+    image: confluentinc/cp-kafka:7.6.1
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    ports:
+      # 29092 → host access (Spring Boot app running on the host uses this)
+      # 9092  → container-to-container (Schema Registry, kafka-init, etc.)
+      - "${KAFKA_HOST_PORT:-29092}:29092"
+    environment:
+      KAFKA_BROKER_ID:    1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENERS:                       PLAINTEXT://0.0.0.0:9092,PLAINTEXT_HOST://0.0.0.0:29092
+      KAFKA_ADVERTISED_LISTENERS:            PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME:     PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR:         1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR:            1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS:         0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      KAFKA_LOG_RETENTION_HOURS:       24      # keep short locally; prod uses 7d (MSK default)
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092 >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 20s
+    restart: unless-stopped
+
+  schema-registry:
+    image: confluentinc/cp-schema-registry:7.6.1
+    depends_on:
+      kafka:
+        condition: service_healthy
+    ports:
+      - "${SCHEMA_REGISTRY_PORT:-8081}:8081"
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME:                    schema-registry
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: kafka:9092
+      SCHEMA_REGISTRY_LISTENERS:                    http://0.0.0.0:8081
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8081/subjects >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 15s
+    restart: unless-stopped
+
+  # One-shot: creates the Kafka topics declared in docs/05-api-and-event-contracts.md.
+  # Exits cleanly after creation; idempotent (--if-not-exists).
+  kafka-init:
+    image: confluentinc/cp-kafka:7.6.1
+    depends_on:
+      kafka:
+        condition: service_healthy
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        echo "Creating ContentHub Kafka topics..."
+        kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic video.uploaded              --partitions 3 --replication-factor 1
+        kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic transcription.completed     --partitions 3 --replication-factor 1
+        kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic render.requested            --partitions 3 --replication-factor 1
+        kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic render.finished             --partitions 3 --replication-factor 1
+        kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic content.published           --partitions 3 --replication-factor 1
+        kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic metrics.ingested            --partitions 3 --replication-factor 1
+        kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic video.uploaded.dlq          --partitions 1 --replication-factor 1
+        kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic transcription.completed.dlq --partitions 1 --replication-factor 1
+        kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic render.requested.dlq        --partitions 1 --replication-factor 1
+        kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic render.finished.dlq         --partitions 1 --replication-factor 1
+        kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic content.published.dlq       --partitions 1 --replication-factor 1
+        kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic metrics.ingested.dlq        --partitions 1 --replication-factor 1
+        echo "Kafka topics ready."
+        kafka-topics --bootstrap-server kafka:9092 --list
+    restart: "no"
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # AWS EMULATION  (LocalStack — local stand-in for S3)
+  # Community edition covers S3, STS, IAM.
+  # Cognito is handled by mock-oauth2 below (LocalStack Pro feature).
+  # ────────────────────────────────────────────────────────────────────────────
+
+  localstack:
+    image: localstack/localstack:3
+    ports:
+      - "${LOCALSTACK_PORT:-4566}:4566"
+    environment:
+      SERVICES:           s3,sts,iam
+      AWS_DEFAULT_REGION: ${AWS_REGION:-us-east-1}
+      PERSISTENCE:        1
+      # Optional: set LOCALSTACK_AUTH_TOKEN in .env.local to unlock Pro features
+      LOCALSTACK_AUTH_TOKEN: ${LOCALSTACK_AUTH_TOKEN:-}
+    volumes:
+      - localstack_data:/var/lib/localstack
+      - /var/run/docker.sock:/var/run/docker.sock
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:4566/_localstack/health"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 20s
+    restart: unless-stopped
+
+  # One-shot: creates the S3 buckets the app expects. Idempotent (2>/dev/null || true).
+  localstack-init:
+    image: amazon/aws-cli:2
+    depends_on:
+      localstack:
+        condition: service_healthy
+    environment:
+      AWS_ACCESS_KEY_ID:     ${AWS_ACCESS_KEY_ID:-local}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-local}
+      AWS_DEFAULT_REGION:    ${AWS_REGION:-us-east-1}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo "Creating S3 buckets in LocalStack..."
+        aws --endpoint-url=http://localstack:4566 s3 mb s3://${S3_MEDIA_BUCKET:-contenthub-media-local}   2>/dev/null || true
+        aws --endpoint-url=http://localstack:4566 s3 mb s3://${S3_RENDERS_BUCKET:-contenthub-renders-local} 2>/dev/null || true
+        echo "S3 buckets ready:"
+        aws --endpoint-url=http://localstack:4566 s3 ls
+    restart: "no"
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # IDENTITY  (mock OIDC — local stand-in for Amazon Cognito, see ADR-0004)
+  # The API Gateway validates JWTs from this issuer in the Spring 'dev' profile.
+  # Interactive login UI: http://localhost:8090/contenthub
+  # JWKS endpoint:        http://localhost:8090/contenthub/jwks
+  # ────────────────────────────────────────────────────────────────────────────
+
+  mock-oauth2:
+    image: ghcr.io/navikt/mock-oauth2-server:2.1.10
+    ports:
+      - "${MOCK_OAUTH2_PORT:-8090}:8080"
+    environment:
+      JSON_CONFIG: |
+        {
+          "interactiveLogin": true,
+          "httpServer": "NettyWrapper",
+          "tokenCallbacks": [
+            {
+              "issuerId": "contenthub",
+              "requestMappings": [
+                {
+                  "requestParam": "scope",
+                  "match": "openid profile email",
+                  "claims": {
+                    "sub":              "dev-user-001",
+                    "email":            "dev@contenthub.local",
+                    "name":             "Dev User",
+                    "cognito:username": "dev-user-001",
+                    "cognito:groups":   ["admin"]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+    restart: unless-stopped
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # OBSERVABILITY
+  # Production topology: Spring Boot → OTel Collector → Datadog/Splunk
+  # Local topology:      Spring Boot → OTel Collector → Jaeger (traces)
+  #                      Prometheus scrapes Spring Boot /actuator/prometheus (metrics)
+  #                      Grafana reads Prometheus + Jaeger
+  # ────────────────────────────────────────────────────────────────────────────
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.100.0
+    depends_on:
+      - jaeger
+    ports:
+      - "4317:4317"   # OTLP gRPC  — configure OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317
+      - "4318:4318"   # OTLP HTTP  — alternative ingestion
+      - "8889:8889"   # Prometheus exporter (OTel-internal metrics)
+    volumes:
+      - ./infra/local/otel/otel-collector-config.yml:/etc/otelcol-contrib/config.yaml:ro
+    restart: unless-stopped
+
+  # Jaeger all-in-one: only exposes the UI to the host.
+  # OTel Collector reaches Jaeger on the internal network (jaeger:4317).
+  jaeger:
+    image: jaegertracing/all-in-one:1.57
+    ports:
+      - "${JAEGER_UI_PORT:-16686}:16686"
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v2.52.0
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    # host.docker.internal resolves on Docker Desktop (Mac/Windows).
+    # On Linux add: extra_hosts: ["host.docker.internal:host-gateway"]
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./infra/local/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.enable-lifecycle"
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:10.4.3
+    depends_on:
+      - prometheus
+      - jaeger
+    ports:
+      - "${GRAFANA_PORT:-3001}:3000"   # 3000 is reserved for the React SPA
+    environment:
+      GF_SECURITY_ADMIN_USER:     admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_AUTH_ANONYMOUS_ENABLED:  "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./infra/local/grafana/provisioning:/etc/grafana/provisioning:ro
+    restart: unless-stopped
+
+# ────────────────────────────────────────────────────────────────────────────
+# NAMED VOLUMES
+# Data survives container restarts; wiped only by `make clean-force`.
+# ────────────────────────────────────────────────────────────────────────────
+
+volumes:
+  postgres_data:
+  mongo_data:
+  zookeeper_data:
+  zookeeper_log:
+  kafka_data:
+  localstack_data:
+  grafana_data:
+  prometheus_data:

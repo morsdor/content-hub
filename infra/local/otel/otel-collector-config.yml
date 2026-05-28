@@ -1,0 +1,57 @@
+# OTel Collector — local dev configuration
+# Mirrors the production pipeline topology without the SaaS cost.
+#
+# Production: Spring Boot → OTel Collector sidecar → Datadog (APM) + Splunk (logs)
+# Local:      Spring Boot → OTel Collector (this)  → Jaeger (traces)
+#                           Prometheus scrapes      → /actuator/prometheus (metrics)
+#                           stdout JSON             → structured logs
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 512
+    spike_limit_mib: 128
+  batch:
+    timeout: 1s
+    send_batch_size: 1024
+
+exporters:
+  # Forward traces to Jaeger via OTLP (internal Docker network)
+  otlp/jaeger:
+    endpoint: jaeger:4317
+    tls:
+      insecure: true
+
+  # Expose OTel-internal metrics for Prometheus to scrape (port 8889)
+  prometheus:
+    endpoint: "0.0.0.0:8889"
+    namespace: otelcol
+
+  # Log received data to stdout at warn verbosity (avoid noise in local dev)
+  debug:
+    verbosity: basic
+
+service:
+  pipelines:
+    traces:
+      receivers:  [otlp]
+      processors: [memory_limiter, batch]
+      exporters:  [otlp/jaeger]
+
+    metrics:
+      receivers:  [otlp]
+      processors: [memory_limiter, batch]
+      exporters:  [prometheus]
+
+    logs:
+      receivers:  [otlp]
+      processors: [memory_limiter, batch]
+      exporters:  [debug]
