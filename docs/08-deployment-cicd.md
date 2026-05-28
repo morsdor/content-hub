@@ -13,14 +13,29 @@ boring, and rollback is always one step away.
 ## 1. Pipeline overview
 
 ```
- ┌─────────┐   ┌──────────────── CI (per PR / per push) ────────────────┐   ┌─────── CD ───────┐
- │  commit │──►│ lint → unit → SAST/secret/SCA → build → image scan →    │──►│ GitOps sync to    │
- │  + PR   │   │ contract tests → integration (Testcontainers) → publish │   │ env via ArgoCD     │
- └─────────┘   │ image (digest) + Helm chart                             │   │ progressive deliver│
-               └──────────────────────────────────────────────────────────┘   └───────────────────┘
-                                          │                                            │
-                            ephemeral qa: terraform apply →                  prod: canary → promote
-                            BlazeMeter + Cucumber → destroy (07,10,12)        or auto-rollback
+ feature/X ──► PR to develop ──► CI + Claude PR review
+                │
+                merge to develop
+                │
+                ▼
+ ┌──────────────────────────────────────────────────────────────────────┐
+ │  CI: lint → arch-test → unit → secret scan → SCA → SAST → build →   │
+ │  contract tests → schema compat → integration → image scan + publish │
+ └──────────────────────────────────────────────────────────────────────┘
+                │                                              │
+    ephemeral QA spins up                         (not triggered for
+    (terraform apply)                              develop merges)
+    load + BDD suite
+    terraform destroy  (~2h window)
+                │
+                └─► PR to main ──► CI (no Claude review; human approval)
+                                        │
+                                        merge to main
+                                        │
+                                        ▼
+                              GitOps digest bump PR ──► ArgoCD
+                              canary 5%→25%→50%→100%    (long-running prod)
+                              auto-rollback on SLO breach
 ```
 
 Two distinct concerns, deliberately separated:
@@ -53,7 +68,11 @@ Stages, in order, with a fail-fast principle (cheapest checks first):
 ```yaml
 # .github/workflows/ci.yml  (illustrative shape)
 name: ci
-on: [pull_request, push]
+on:
+  pull_request:
+    branches: [develop, main]    # feature→develop PRs AND develop→main PRs
+  push:
+    branches: [develop, main]    # image publish gate fires only on these branches
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -92,10 +111,124 @@ jobs:
       - uses: aquasecurity/trivy-action@master
         with: { image-ref: '${{ env.ECR }}/${{ env.SVC }}:${{ env.GIT_SHA }}' }
 
-      # ── Publish (main only, by immutable digest) ─────────────────────
-      - if: github.ref == 'refs/heads/main'
+      # ── Publish (develop or main only, by immutable digest) ─────────
+      - if: github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main'
         run: docker push $ECR/$SVC:$GIT_SHA
 ```
+
+### 2.1 Claude automated PR review (PRs to `develop` only)
+
+Every PR targeting `develop` gets an automated review from Claude Code before a human merges. PRs to `main` (the `develop → main` promotion) are human-reviewed only — they should already be clean.
+
+```yaml
+# .github/workflows/claude-pr-review.yml
+name: claude-pr-review
+on:
+  pull_request:
+    branches: [develop]
+    types: [opened, synchronize, reopened]
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: anthropics/claude-code-action@beta
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          direct_prompt: |
+            Review this pull request against the ContentHub project conventions in CLAUDE.md.
+            Check specifically:
+            1. No cross-module DB access (ADR-0009) — each module touches only its own tables
+            2. No dual-writes to Kafka — all events go through the transactional outbox (ADR-0006)
+            3. All Kafka consumers are idempotent (use upserts or dedupe on event ID)
+            4. No prod config baked into code — env-specific values via Spring profiles only
+            5. Test coverage for new logic (unit tests + integration tests where appropriate)
+            6. Security: no SQL injection exposure, no secrets in code, input validated at boundaries
+            Post a concise review comment on the PR. Use ✅ / ⚠️ / ❌ per concern.
+```
+
+> **Why only `develop` PRs:** the `develop → main` PR is a promotion checkpoint, not a code
+> introduction point. By then Claude has already reviewed the individual feature PRs; a second
+> automated review adds noise without signal. Human eyes on the promotion PR are what matter.
+
+### 2.2 Ephemeral QA deploy on `develop` merge — **PAUSED**
+
+> **Status: not active.** The workflow is written and ready; it is disabled via `DEPLOY_QA_ENABLED: "false"`.
+> Flip to `"true"` only after all prerequisites below are met.
+
+**Prerequisites before enabling:**
+
+| # | What | How |
+| --- | --- | --- |
+| 1 | AWS OIDC provider for GitHub Actions | one-time in IAM console — lets GitHub get short-lived tokens, no static keys ever stored |
+| 2 | IAM role with trust policy for this repo | trust `repo:org/content-hub:ref:refs/heads/develop`; needs EKS, RDS, MSK, S3, VPC, ECR permissions |
+| 3 | Terraform state backend | S3 bucket + DynamoDB table for state locking (create manually once) |
+| 4 | Terraform modules written | backlog item 4 — `infra/envs/qa/` must exist with working `main.tf` |
+| 5 | GitHub Secrets/Variables set | `AWS_QA_ROLE_ARN` (secret), `TF_STATE_BUCKET` (variable), `AWS_REGION` (variable) |
+
+**Why OIDC instead of static `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`:**  
+Static keys are long-lived credentials stored in GitHub Secrets — if the repo is compromised, the keys are too.
+OIDC federation issues a short-lived token scoped to the exact workflow run; it expires in minutes and there
+is nothing to rotate or leak.
+
+```yaml
+# .github/workflows/qa-deploy.yml  (PAUSED — flip DEPLOY_QA_ENABLED to enable)
+name: qa-deploy
+on:
+  push:
+    branches: [develop]
+
+permissions:
+  id-token: write    # required for AWS OIDC token exchange
+  contents: read
+
+env:
+  DEPLOY_QA_ENABLED: "false"    # ← flip to "true" once prerequisites are met (see §2.2)
+
+jobs:
+  deploy-qa:
+    if: env.DEPLOY_QA_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    environment: qa              # GitHub Environment gate (optional approval + env secrets)
+    steps:
+      - uses: actions/checkout@v4
+
+      # ── AWS credentials via OIDC — no static keys ────────────────────
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume:    ${{ secrets.AWS_QA_ROLE_ARN }}
+          aws-region:        ${{ vars.AWS_REGION }}
+
+      - uses: hashicorp/setup-terraform@v3
+        with: { terraform_version: "~1.8" }
+
+      # ── Spin up ephemeral QA stack ────────────────────────────────────
+      - name: terraform apply
+        run: |
+          cd infra/envs/qa
+          terraform init -backend-config="bucket=${{ vars.TF_STATE_BUCKET }}" \
+                         -backend-config="key=qa/terraform.tfstate"
+          terraform apply -auto-approve -var="image_tag=${{ github.sha }}"
+
+      # ── Run acceptance suite against live QA ─────────────────────────
+      - name: load + BDD tests
+        run: mvn verify -P qa-acceptance -Denv.base-url=${{ steps.tf-outputs.outputs.app_url }}
+
+      # ── Always destroy — even if tests fail ──────────────────────────
+      - name: terraform destroy
+        if: always()
+        run: |
+          cd infra/envs/qa
+          terraform destroy -auto-approve
+```
+
+> **The `if: always()` on destroy is load-bearing** — if tests fail and destroy is skipped, you have
+> a forgotten running AWS stack burning money. `if: always()` fires regardless of prior step outcome.
 
 > **SonarCloud vs CodeQL:** SonarCloud is the primary quality + security gate here (coverage
 > enforcement, code smells, Java-specific vuln patterns). GitHub's CodeQL can be enabled as a
@@ -263,20 +396,48 @@ Goal: rename column  card.title → card.name   without downtime
 
 ---
 
-## 6. Environment promotion
+## 6. Branch strategy and environment promotion
+
+### Branches
+
+| Branch | Purpose | Lifetime |
+| --- | --- | --- |
+| `feature/*` | one feature/fix; tested locally against docker-compose | short-lived |
+| `develop` | integration branch; triggers ephemeral QA on every merge | long-lived |
+| `main` | production-ready code; triggers prod canary deploy on every merge | permanent |
+
+### Promotion flow
 
 ```
- PR merged to main
-   └─► CI builds + proves artifact
-        └─► auto-deploy to QA (ephemeral; terraform apply → tests → destroy, 07)
-             └─► on green + manual approval ─► canary to PROD ─► (auto-analysis) ─► full
+ feature/X
+   │
+   ├─► PR to develop ──► CI runs + Claude automated review
+   │                         │ (human reviews Claude's comment + approves)
+   │                         ▼
+   │                   merged to develop
+   │                         │
+   │                         ├─► [PAUSED] ephemeral QA: terraform apply        ← re-enable in §2.2
+   │                         │     load tests (BlazeMeter) + BDD suite          when Terraform modules
+   │                         │     ≤2h window → terraform destroy               + OIDC are ready
+   │                         │
+   │                         └─► (while QA paused) promote manually to main after local validation
+   │
+   └─► (repeat per feature)
+
+ PR to main approved + merged
+   │
+   └─► CI rebuilds + re-proves artifact
+        └─► GitOps: bot bumps image digest in infra/deploy/prod/values.yaml
+             └─► ArgoCD picks up the change
+                  └─► canary: 5% → 25% → 50% → 100%
+                       │  auto-rollback if SLO breached during any step
+                       └─► full traffic on prod
 ```
 
-- **QA is ephemeral and gated** — promotion to prod requires QA's load + BDD suite to pass against a
-  real cloud stack.
-- **Prod requires human approval** for the digest bump (GitOps PR) — the one deliberate manual gate.
-- **Same artifact promoted** — the exact image proven in QA is what reaches prod (digest-pinned); we
-  never rebuild between environments ([`02` §9](./02-system-architecture.md)).
+- **QA deploy is PAUSED** — the `qa-deploy.yml` workflow exists but is disabled (`DEPLOY_QA_ENABLED: "false"`). See §2.2 for the full prerequisite checklist (OIDC, IAM role, Terraform state backend, Terraform modules). Enable it when backlog item 4 (Terraform modules) is complete.
+- **While paused:** merge `develop → main` manually after validating locally against docker-compose. No AWS spend until QA is enabled.
+- **Prod requires human approval** for the `develop → main` PR — the one deliberate manual gate.
+- **Same artifact promoted** — the exact image proven in QA will reach prod (digest-pinned); never rebuilt between environments ([`02` §9](./02-system-architecture.md)).
 
 ---
 

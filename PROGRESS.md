@@ -19,6 +19,12 @@
 - 10 ADRs in `docs/03-adr/` covering every major technical decision
 - Architecture SVG (`contenthub_architecture_overview.svg`)
 
+### 2026-05-28 — Branching strategy + Claude PR review (docs/08 updated)
+- `feature/*` → `develop` (ephemeral QA, ~2h, then destroy) → `main` (long-running prod canary)
+- CI triggers on PRs/pushes to `develop` and `main` only
+- Claude automated PR review fires on every PR targeting `develop`; not on `develop → main` (human gate)
+- `docs/08-deployment-cicd.md` updated: §1 diagram, §2 YAML on: triggers, new §2.1 Claude review workflow, rewritten §6
+
 ### 2026-05-28 — Local dev stack
 - `docker-compose.yml` — 13 services: Postgres, MongoDB, Kafka + Zookeeper + Schema Registry,
   LocalStack (S3), mock-oauth2 (Cognito stand-in), OTel Collector, Jaeger, Prometheus, Grafana
@@ -31,7 +37,7 @@
 
 ## In Progress
 
-_Nothing. The local dev stack milestone just completed._
+_Nothing. Docs + local stack + CI/CD strategy complete. Ready to start Spring Boot skeleton._
 
 ---
 
@@ -80,10 +86,10 @@ backend/
 3. **Transcription mock pipeline** — `transcription-module` consumes `video.uploaded`, calls the mock
    ASR adapter (canned word-timed JSON), writes to MongoDB, emits `transcription.completed`
 4. **Terraform module skeletons** — VPC, EKS/Fargate, RDS, MSK, S3, Cognito (infra/modules/)
-5. **GitHub Actions CI** — see `docs/08-deployment-cicd.md` §2 for the full stage map. Toolchain
-   settled: Snyk OSS (SCA), SonarCloud (SAST + quality gate), Spring Cloud Contract (svc↔svc
-   contracts), Pact (frontend↔API contracts), Confluent Schema Registry Maven plugin (Kafka compat),
-   Trivy (image scan). ArgoCD runs inside EKS (monorepo deploy path at `infra/deploy/`). See §3.1–3.2.
+5. **GitHub Actions CI** — implement `ci.yml` (§2: Snyk OSS, SonarCloud, Spring Cloud Contract,
+   Pact, Schema Registry plugin, Trivy) and `claude-pr-review.yml` (§2.1, PRs to `develop` only).
+   QA deploy workflow (`qa-deploy.yml`) is already written in §2.2 but **PAUSED** — enable it after
+   Terraform modules (item 4) are done and OIDC + IAM role are set up in AWS.
 
 ---
 
@@ -111,6 +117,15 @@ Non-negotiable rules (read CLAUDE.md for the full list):
 - Every Kafka consumer must be idempotent
 - Spring profile 'dev' wires to docker-compose (run `make dev-up` if not already running)
 - Same image everywhere — no prod secrets in the build, only in the environment
+
+Settled decisions (do not re-litigate):
+- Branch strategy: feature/* → develop (ephemeral QA, ~2h, terraform destroy) → main (prod canary)
+- CI fires on PRs/pushes to develop and main only; not on feature branches directly
+- Claude automated PR review fires on every PR targeting develop (docs/08 §2.1); NOT on develop→main
+- develop→main is a human-reviewed promotion PR; prod deploy is ArgoCD canary via GitOps digest bump
+- CI toolchain: Snyk OSS (SCA), SonarCloud (SAST), Spring Cloud Contract + Pact (contracts),
+  Confluent Schema Registry Maven plugin (Kafka compat), Trivy (image scan)
+- ArgoCD runs inside EKS as pods; monorepo deploy path at infra/deploy/envs/{qa,prod}/values.yaml
 
 Before writing any code, show the proposed structure (pom.xml layout, package tree) and get
 confirmation. Then implement fully — no placeholders, no TODOs in load-bearing paths.
