@@ -25,6 +25,19 @@
 - Claude automated PR review fires on every PR targeting `develop`; not on `develop → main` (human gate)
 - `docs/08-deployment-cicd.md` updated: §1 diagram, §2 YAML on: triggers, new §2.1 Claude review workflow, rewritten §6
 
+### 2026-05-28 — Spring Boot modular monolith skeleton
+- `backend/` Maven multi-module project: parent + 5 domain modules + `app`
+- Spring Boot 3.4.1 / Java 21 / Hibernate 6.6 / Kafka / MongoDB / Flyway
+- `shared-kernel`: `OutboxEntry` JPA entity, `OutboxRepository`, `OutboxRelayService` (polling relay, wired but off by default)
+- `shared-kernel`: `ContentHubArchRules` (published in main — app module executes them)
+- Flyway `V1__initial_schema.sql`: full Postgres DDL from `docs/04` (all tables, indexes, citext extension)
+- `app`: `ContentHubApplication`, `SecurityConfiguration` (JWT/OAuth2 resource server), `AwsConfiguration` (S3Presigner)
+- `app`: `application.yml` / `application-dev.yml` / `application-test.yml`
+- `app/arch/ModuleBoundaryTest`: 5 ArchUnit rules — all pass — enforcing no cross-module DB access (ADR-0009)
+- `app/ApplicationSmokeTest`: Testcontainers smoke test (awaiting Testcontainers 1.21+ for Docker Desktop 4.75 compatibility)
+- `/actuator/health` verified UP in 6s against live docker-compose stack (`SPRING_PROFILES_ACTIVE=dev`)
+- Build: `make backend-build` (requires `JAVA_HOME` → JDK 21; Homebrew openjdk 25 is incompatible with Lombok 1.18.36)
+
 ### 2026-05-28 — Local dev stack
 - `docker-compose.yml` — 13 services: Postgres, MongoDB, Kafka + Zookeeper + Schema Registry,
   LocalStack (S3), mock-oauth2 (Cognito stand-in), OTel Collector, Jaeger, Prometheus, Grafana
@@ -37,59 +50,72 @@
 
 ## In Progress
 
-_Nothing. Docs + local stack + CI/CD strategy complete. Ready to start Spring Boot skeleton._
+_Nothing. Spring Boot skeleton complete._
 
 ---
 
 ## Next
 
-### Spring Boot modular monolith skeleton
+### React + TypeScript SPA skeleton
 
-**Scope:** One Spring Boot 3.x / Java 21 Maven multi-module app. No separate deployables yet (ADR-0009).
-Module structure:
+**Scope:** A runnable Vite + React 18 + TypeScript SPA in `frontend/` that mirrors the backend's
+domain structure and proves the auth handshake against mock-oauth2 locally.
 
 ```
-backend/
-├── pom.xml                         (parent)
-├── shared-kernel/                  domain primitives, outbox model, shared event POJOs, ArchUnit rules
-├── workspace-module/               Kanban, cards, scripts (CRDT blob), WebSocket fan-out
-├── media-module/                   presigned S3 upload, media_asset, EDL, render trigger
-├── transcription-module/           video.uploaded consumer, mock ASR adapter, transcript write to Mongo
-├── analytics-module/               OAuth grant, metrics ingestion stub
-└── app/                            Spring Boot entry point, wires all modules, Flyway migrations
+frontend/
+├── package.json                  (Vite + React + TS + Redux Toolkit + React Router)
+├── vite.config.ts                (dev proxy → localhost:8080, HMR on :5173)
+├── index.html
+└── src/
+    ├── main.tsx                  (ReactDOM.createRoot, <App/>)
+    ├── App.tsx                   (React Router shell: /login, /workspaces, /workspaces/:id)
+    ├── auth/
+    │   ├── CognitoAuthProvider.tsx   (wraps amazon-cognito-identity-js or amplify-lite)
+    │   └── useAuth.ts                (hook: user, login(), logout(), token)
+    ├── store/
+    │   ├── index.ts              (configureStore with all slice reducers)
+    │   ├── workspace/slice.ts    (workspaces list, current workspace)
+    │   └── auth/slice.ts         (JWT token, user profile)
+    ├── features/
+    │   ├── workspace/            (WorkspaceList, WorkspaceCreate)
+    │   ├── media/                (MediaUpload stub)
+    │   └── analytics/            (stub)
+    └── api/
+        ├── client.ts             (axios instance; attaches Bearer token from store)
+        └── workspaceApi.ts       (RTK Query or plain axios: GET/POST /api/v1/workspaces)
 ```
 
 **Acceptance criteria for this task:**
-- [ ] Parent pom with dependency management (Spring Boot 3.x BOM, Kafka, JPA, Flyway, OTel, Testcontainers)
-- [ ] Each module has its own pom, package structure (controller/service/domain/repository/adapter)
-- [ ] ArchUnit test in shared-kernel enforcing no cross-module DB access (ADR-0009)
-- [ ] `app/` boots against the docker-compose stack with `SPRING_PROFILES_ACTIVE=dev`
-- [ ] Flyway V1 migration applying the full Postgres schema from `docs/04-data-model.md`
-- [ ] `/actuator/health` returns UP (Prometheus can scrape it)
-- [ ] Outbox table exists and the shared-kernel outbox relay stub is wired (even if no-op for now)
+- [ ] `npm run dev` serves the app on `:5173`; Vite proxies `/api` → `localhost:8080`
+- [ ] Login page redirects to mock-oauth2 (`:8090`) and back; JWT stored in Redux + localStorage
+- [ ] Authenticated `GET /api/v1/workspaces` (with Bearer header) → 200 from Spring backend
+- [ ] `WorkspaceCreate` form calls `POST /api/v1/workspaces` and shows the new workspace in the list
+- [ ] React Router guards: unauthenticated users redirect to `/login`
+- [ ] `npm run build` produces a `dist/` (proves no TypeScript errors)
+- [ ] WebSocket client stub: `useWebSocket(workspaceId)` hook exists but is no-op until Phase 1
 
 **Key files to read before starting:**
-- `docs/02-system-architecture.md` §3 (module responsibilities) and §4 (hexagonal layering)
-- `docs/03-adr/0009-modular-monolith-first.md`
-- `docs/03-adr/0006-transactional-outbox.md`
-- `docs/04-data-model.md` (the full Postgres DDL)
-- `.env.local.example` (the connection strings for the `dev` Spring profile)
+- `docs/01-product-requirements.md` §FR-WS (workspace features) — what the UI must do
+- `docs/02-system-architecture.md` §3 container responsibilities + §6 sync vs async patterns
+- `docs/03-adr/0004-cognito-for-identity.md` — why Cognito/OIDC; mock-oauth2 stands in locally
+- `docs/06-security-architecture.md` §JWT — token shape, claims, expiry handling
+- `backend/app/src/main/java/com/contenthub/config/SecurityConfiguration.java` — what the backend expects
+- `.env.local.example` — `OIDC_ISSUER_URI`, `MOCK_OAUTH2_PORT` values
 
 ---
 
 ## After Next (backlog, in order)
 
-1. **React + TypeScript SPA skeleton** — Vite + Redux Toolkit, module structure matching backend domains,
-   Cognito SDK (dev profile → mock-oauth2), WebSocket client stub
-2. **Flyway V2 + Phase 0 walking skeleton** — auth flow end-to-end: login → create workspace → upload
-   media → see presigned S3 URL returned → `video.uploaded` event emitted to Kafka
-3. **Transcription mock pipeline** — `transcription-module` consumes `video.uploaded`, calls the mock
-   ASR adapter (canned word-timed JSON), writes to MongoDB, emits `transcription.completed`
-4. **Terraform module skeletons** — VPC, EKS/Fargate, RDS, MSK, S3, Cognito (infra/modules/)
-5. **GitHub Actions CI** — implement `ci.yml` (§2: Snyk OSS, SonarCloud, Spring Cloud Contract,
+1. **Flyway V2 + Phase 0 walking skeleton** — auth flow end-to-end: login → JWT validated by Gateway
+   → `POST /api/v1/workspaces` persists to Postgres → `POST /api/v1/media/upload-url` returns
+   presigned S3 URL → browser PUT to LocalStack → `video.uploaded` written to outbox → relay
+   publishes to Kafka → `transcription-module` consumes it (mock ASR) → transcript in MongoDB
+2. **Transcription mock pipeline** — verify the full Kafka event chain end-to-end with integration tests
+3. **Terraform module skeletons** — VPC, EKS/Fargate, RDS, MSK, S3, Cognito (infra/modules/)
+4. **GitHub Actions CI** — implement `ci.yml` (§2: Snyk OSS, SonarCloud, Spring Cloud Contract,
    Pact, Schema Registry plugin, Trivy) and `claude-pr-review.yml` (§2.1, PRs to `develop` only).
    QA deploy workflow (`qa-deploy.yml`) is already written in §2.2 but **PAUSED** — enable it after
-   Terraform modules (item 4) are done and OIDC + IAM role are set up in AWS.
+   Terraform modules (item 3) are done and OIDC + IAM role are set up in AWS.
 
 ---
 
@@ -105,11 +131,15 @@ Start by reading these files in order:
   1. CLAUDE.md            ← project conventions, rules, module map, local stack
   2. PROGRESS.md          ← what is done, what is in progress, exact next task
   3. docs/02-system-architecture.md §3–4   ← service responsibilities + hexagonal layering
-  4. docs/03-adr/0009-modular-monolith-first.md
-  5. docs/03-adr/0006-transactional-outbox.md
-  6. docs/04-data-model.md                 ← the Postgres DDL we need to implement
+  4. docs/05-api-and-event-contracts.md    ← REST + Kafka event contracts
 
 Then pick up PROGRESS.md §Next and implement it.
+
+Environment notes:
+- Build: JAVA_HOME=/Library/Java/JavaVirtualMachines/jdk-21.jdk/Contents/Home (Homebrew openjdk 25 breaks Lombok)
+- Use `make backend-build`, `make backend-test`, `make backend-run` (Makefile pins JDK 21)
+- MongoDB URI needs ?authSource=admin (root user is in admin database)
+- Testcontainers smoke test (ApplicationSmokeTest) requires Testcontainers ≥1.21 for Docker Desktop 4.75
 
 Non-negotiable rules (read CLAUDE.md for the full list):
 - Modular monolith first: one Spring Boot deployable, 5 Maven modules, no cross-module DB access
@@ -126,7 +156,4 @@ Settled decisions (do not re-litigate):
 - CI toolchain: Snyk OSS (SCA), SonarCloud (SAST), Spring Cloud Contract + Pact (contracts),
   Confluent Schema Registry Maven plugin (Kafka compat), Trivy (image scan)
 - ArgoCD runs inside EKS as pods; monorepo deploy path at infra/deploy/envs/{qa,prod}/values.yaml
-
-Before writing any code, show the proposed structure (pom.xml layout, package tree) and get
-confirmation. Then implement fully — no placeholders, no TODOs in load-bearing paths.
 ```
