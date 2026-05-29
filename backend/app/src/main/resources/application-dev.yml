@@ -1,0 +1,10 @@
+outbox:
+  relay:
+    enabled: true
+    poll-interval-ms: 1000
+
+logging:
+  level:
+    com.contenthub: DEBUG
+    org.springframework.kafka: INFO
+    org.flywaydb: INFO
