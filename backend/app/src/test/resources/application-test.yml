@@ -1,0 +1,16 @@
+spring:
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: http://localhost:65534/contenthub/jwks
+
+outbox:
+  relay:
+    enabled: false
+
+logging:
+  level:
+    com.contenthub: DEBUG
+    org.testcontainers: WARN
+    org.flywaydb: INFO
