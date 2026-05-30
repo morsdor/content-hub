@@ -14,6 +14,7 @@ import java.util.UUID;
 public class VideoUploadedEvent {
 
     public static final String TOPIC = "video.uploaded";
+    public static final String EVENT_TYPE = "VideoUploaded";
 
     private UUID mediaId;
     private UUID workspaceId;

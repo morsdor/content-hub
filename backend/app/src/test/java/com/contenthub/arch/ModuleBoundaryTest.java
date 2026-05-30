@@ -39,11 +39,14 @@ class ModuleBoundaryTest {
             ContentHubArchRules.persistenceAdaptersArePrivateTo("analytics",
                     "workspace", "media", "transcription");
 
+    // Scope: prevents domain classes from extending/importing Spring Data repository interfaces.
+    // Jakarta Persistence annotations (@Entity, @Column) and MongoDB annotations (@Document)
+    // are present on domain models as an accepted Phase 0 trade-off (no separate JPA entity layer).
     @ArchTest
-    static final ArchRule domain_model_does_not_import_spring_data =
+    static final ArchRule domain_does_not_extend_spring_data_repositories =
             noClasses()
                     .that().resideInAPackage("com.contenthub.*.domain..")
                     .should().accessClassesThat()
                     .resideInAPackage("org.springframework.data.jpa.repository..")
-                    .because("Domain model must not depend on Spring Data JPA (hexagonal layering)");
+                    .because("Domain model must not extend Spring Data repositories (hexagonal layering)");
 }

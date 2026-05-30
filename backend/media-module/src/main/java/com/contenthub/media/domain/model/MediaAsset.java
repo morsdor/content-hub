@@ -1,8 +1,6 @@
 package com.contenthub.media.domain.model;
 
-import com.contenthub.media.adapter.out.persistence.MediaStatusConverter;
 import jakarta.persistence.Column;
-import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -53,7 +51,6 @@ public class MediaAsset {
     private Integer durationMs;
 
     @Setter
-    @Convert(converter = MediaStatusConverter.class)
     @Column(nullable = false)
     @Builder.Default
     private MediaStatus status = MediaStatus.UPLOADING;

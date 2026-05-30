@@ -3,7 +3,10 @@ spring:
     oauth2:
       resourceserver:
         jwt:
-          jwk-set-uri: http://localhost:65534/contenthub/jwks
+          # Static public key removes the network dependency on a JWK endpoint.
+          # Tests that need to call authenticated endpoints should sign JWTs with the
+          # matching private key (generate on demand with JWKs or use spring-security-test).
+          public-key-location: classpath:test-public.pem
 
 outbox:
   relay:

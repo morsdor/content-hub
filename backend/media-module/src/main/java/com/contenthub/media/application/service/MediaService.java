@@ -54,9 +54,13 @@ public class MediaService implements RequestPresignedUploadUseCase, ConfirmUploa
 
     @Override
     @Transactional
-    public void confirmUpload(UUID mediaId, String traceId) {
+    public void confirmUpload(UUID mediaId, UUID callerUserId, String traceId) {
         MediaAsset asset = mediaPersistencePort.findById(mediaId)
                 .orElseThrow(() -> new NoSuchElementException("Media asset not found: " + mediaId));
+
+        // Phase 1: verify callerUserId is a member of asset.getWorkspaceId() via a
+        // WorkspaceMembershipPort outbound port (cross-module query over API, not DB).
+        // Skipped in Phase 0 — all authenticated users can currently confirm uploads.
 
         asset.setStatus(MediaStatus.UPLOADED);
         asset.setUpdatedAt(Instant.now());
@@ -74,7 +78,9 @@ public class MediaService implements RequestPresignedUploadUseCase, ConfirmUploa
         try {
             String payload = objectMapper.writeValueAsString(event);
             outboxRepository.save(OutboxEntry.of(
-                    "MediaAsset", mediaId, VideoUploadedEvent.TOPIC, payload, traceId));
+                    "MediaAsset", mediaId,
+                    VideoUploadedEvent.EVENT_TYPE, VideoUploadedEvent.TOPIC,
+                    payload, traceId));
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("Failed to serialize VideoUploadedEvent for mediaId=" + mediaId, e);
         }

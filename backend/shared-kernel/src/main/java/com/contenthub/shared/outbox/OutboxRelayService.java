@@ -32,13 +32,16 @@ public class OutboxRelayService {
         unsent.forEach(this::publishEntry);
     }
 
+    // Trade-off: .get(10s) holds the Postgres connection (from @Transactional) while
+    // waiting for the Kafka broker ack. Acceptable at Phase 0 batch sizes; the full fix
+    // (claim-then-publish pattern) is tracked in the backlog for multi-instance scaling.
     private void publishEntry(OutboxEntry entry) {
         try {
             kafkaTemplate
-                    .send(entry.getEventType(), entry.getAggregateId().toString(), entry.getPayload())
+                    .send(entry.getTopic(), entry.getAggregateId().toString(), entry.getPayload())
                     .get(10, TimeUnit.SECONDS);
             outboxRepository.markSent(entry.getId(), Instant.now());
-            log.debug("Relayed outbox entry {} → topic {}", entry.getId(), entry.getEventType());
+            log.debug("Relayed outbox entry {} → topic {}", entry.getId(), entry.getTopic());
         } catch (Exception e) {
             log.warn("Failed to relay outbox entry {} (will retry): {}", entry.getId(), e.getMessage());
         }

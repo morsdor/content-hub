@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.security.Principal;
 import java.util.UUID;
 
 @RestController
@@ -39,8 +40,9 @@ public class MediaController {
     // Transitions the asset UPLOADING → UPLOADED and writes the video.uploaded outbox entry.
     @PatchMapping("/{mediaId}/confirm-upload")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void confirmUpload(@PathVariable UUID mediaId) {
+    public void confirmUpload(@PathVariable UUID mediaId, Principal principal) {
+        UUID callerUserId = UUID.fromString(principal.getName());
         // Trace ID: proper OTel propagation wired in Phase 1; UUID placeholder for Phase 0
-        confirmUploadUseCase.confirmUpload(mediaId, UUID.randomUUID().toString());
+        confirmUploadUseCase.confirmUpload(mediaId, callerUserId, UUID.randomUUID().toString());
     }
 }
