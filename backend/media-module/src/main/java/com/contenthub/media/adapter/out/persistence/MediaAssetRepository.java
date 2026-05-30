@@ -1,15 +1,16 @@
 package com.contenthub.media.adapter.out.persistence;
 
+import com.contenthub.media.application.port.out.MediaPersistencePort;
 import com.contenthub.media.domain.model.MediaAsset;
+import com.contenthub.media.domain.model.MediaStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
-public interface MediaAssetRepository extends JpaRepository<MediaAsset, UUID> {
+public interface MediaAssetRepository extends JpaRepository<MediaAsset, UUID>, MediaPersistencePort {
 
-    List<MediaAsset> findByWorkspaceIdAndStatus(UUID workspaceId, String status);
+    List<MediaAsset> findByWorkspaceIdAndStatus(UUID workspaceId, MediaStatus status);
 
-    Optional<MediaAsset> findByIdAndWorkspaceId(UUID id, UUID workspaceId);
+    java.util.Optional<MediaAsset> findByIdAndWorkspaceId(UUID id, UUID workspaceId);
 }

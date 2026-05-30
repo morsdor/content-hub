@@ -4,6 +4,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
+import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
@@ -30,8 +31,7 @@ public class AwsConfiguration {
     public S3Client s3Client() {
         var builder = S3Client.builder()
                 .region(Region.of(region))
-                .credentialsProvider(StaticCredentialsProvider.create(
-                        AwsBasicCredentials.create(accessKeyId, secretAccessKey)));
+                .credentialsProvider(resolveCredentials());
 
         if (!endpointUrl.isBlank()) {
             builder.endpointOverride(URI.create(endpointUrl))
@@ -45,13 +45,22 @@ public class AwsConfiguration {
     public S3Presigner s3Presigner() {
         var builder = S3Presigner.builder()
                 .region(Region.of(region))
-                .credentialsProvider(StaticCredentialsProvider.create(
-                        AwsBasicCredentials.create(accessKeyId, secretAccessKey)));
+                .credentialsProvider(resolveCredentials());
 
         if (!endpointUrl.isBlank()) {
             builder.endpointOverride(URI.create(endpointUrl));
         }
 
         return builder.build();
+    }
+
+    // LocalStack (endpointUrl set) uses static creds — any value works.
+    // Real AWS uses the default chain: IRSA → instance profile → env vars → ~/.aws
+    private software.amazon.awssdk.auth.credentials.AwsCredentialsProvider resolveCredentials() {
+        if (!endpointUrl.isBlank()) {
+            return StaticCredentialsProvider.create(
+                    AwsBasicCredentials.create(accessKeyId, secretAccessKey));
+        }
+        return DefaultCredentialsProvider.create();
     }
 }

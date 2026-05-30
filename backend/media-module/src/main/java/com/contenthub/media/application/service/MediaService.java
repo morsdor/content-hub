@@ -1,22 +1,33 @@
 package com.contenthub.media.application.service;
 
-import com.contenthub.media.adapter.out.persistence.MediaAssetRepository;
+import com.contenthub.media.application.port.in.ConfirmUploadUseCase;
 import com.contenthub.media.application.port.in.RequestPresignedUploadUseCase;
+import com.contenthub.media.application.port.out.MediaPersistencePort;
 import com.contenthub.media.application.port.out.MediaStoragePort;
 import com.contenthub.media.domain.model.MediaAsset;
+import com.contenthub.media.domain.model.MediaStatus;
+import com.contenthub.shared.event.VideoUploadedEvent;
+import com.contenthub.shared.outbox.OutboxEntry;
+import com.contenthub.shared.outbox.OutboxRepository;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.net.URL;
+import java.time.Instant;
+import java.util.NoSuchElementException;
 import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
-public class MediaService implements RequestPresignedUploadUseCase {
+public class MediaService implements RequestPresignedUploadUseCase, ConfirmUploadUseCase {
 
-    private final MediaAssetRepository mediaAssetRepository;
+    private final MediaPersistencePort mediaPersistencePort;
     private final MediaStoragePort mediaStoragePort;
+    private final OutboxRepository outboxRepository;
+    private final ObjectMapper objectMapper;
 
     @Override
     @Transactional
@@ -32,12 +43,40 @@ public class MediaService implements RequestPresignedUploadUseCase {
                 .s3Bucket(bucket)
                 .contentType(contentType)
                 .sizeBytes(sizeBytes)
-                .status("uploading")
+                .status(MediaStatus.UPLOADING)
                 .build();
 
-        MediaAsset saved = mediaAssetRepository.save(asset);
+        MediaAsset saved = mediaPersistencePort.save(asset);
         URL presignedUrl = mediaStoragePort.generatePresignedPutUrl(bucket, key, contentType, sizeBytes);
 
         return new PresignedUpload(saved.getId(), presignedUrl, key);
+    }
+
+    @Override
+    @Transactional
+    public void confirmUpload(UUID mediaId, String traceId) {
+        MediaAsset asset = mediaPersistencePort.findById(mediaId)
+                .orElseThrow(() -> new NoSuchElementException("Media asset not found: " + mediaId));
+
+        asset.setStatus(MediaStatus.UPLOADED);
+        asset.setUpdatedAt(Instant.now());
+        mediaPersistencePort.save(asset);
+
+        VideoUploadedEvent event = VideoUploadedEvent.builder()
+                .mediaId(mediaId)
+                .workspaceId(asset.getWorkspaceId())
+                .cardId(asset.getCardId())
+                .s3Key(asset.getS3Key())
+                .s3Bucket(asset.getS3Bucket())
+                .traceId(traceId)
+                .build();
+
+        try {
+            String payload = objectMapper.writeValueAsString(event);
+            outboxRepository.save(OutboxEntry.of(
+                    "MediaAsset", mediaId, VideoUploadedEvent.TOPIC, payload, traceId));
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("Failed to serialize VideoUploadedEvent for mediaId=" + mediaId, e);
+        }
     }
 }

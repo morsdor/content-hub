@@ -1,8 +1,11 @@
 package com.contenthub.workspace.application.service;
 
-import com.contenthub.workspace.adapter.out.persistence.WorkspaceRepository;
 import com.contenthub.workspace.application.port.in.CreateWorkspaceUseCase;
+import com.contenthub.workspace.application.port.out.MemberPersistencePort;
+import com.contenthub.workspace.application.port.out.WorkspacePersistencePort;
 import com.contenthub.workspace.domain.model.Workspace;
+import com.contenthub.workspace.domain.model.WorkspaceMember;
+import com.contenthub.workspace.domain.model.WorkspaceMemberId;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -13,7 +16,8 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class WorkspaceService implements CreateWorkspaceUseCase {
 
-    private final WorkspaceRepository workspaceRepository;
+    private final WorkspacePersistencePort workspacePersistencePort;
+    private final MemberPersistencePort memberPersistencePort;
 
     @Override
     @Transactional
@@ -23,6 +27,13 @@ public class WorkspaceService implements CreateWorkspaceUseCase {
                 .plan(plan)
                 .createdBy(createdBy)
                 .build();
-        return workspaceRepository.save(workspace).getId();
+        Workspace saved = workspacePersistencePort.save(workspace);
+
+        memberPersistencePort.save(WorkspaceMember.builder()
+                .id(new WorkspaceMemberId(saved.getId(), createdBy))
+                .role("owner")
+                .build());
+
+        return saved.getId();
     }
 }

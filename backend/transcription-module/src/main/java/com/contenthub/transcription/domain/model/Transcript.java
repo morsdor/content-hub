@@ -1,9 +1,9 @@
 package com.contenthub.transcription.domain.model;
 
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.AllArgsConstructor;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
@@ -22,7 +22,7 @@ public class Transcript {
     @Id
     private String id;
 
-    @Indexed
+    @Indexed(unique = true)
     private UUID mediaAssetId;
 
     private UUID workspaceId;
@@ -31,7 +31,7 @@ public class Transcript {
     private long durationMs;
 
     @Builder.Default
-    private String status = "processing";
+    private TranscriptStatus status = TranscriptStatus.PROCESSING;
 
     private List<TranscriptSegment> segments;
 

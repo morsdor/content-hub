@@ -1,12 +1,14 @@
 package com.contenthub.transcription.application.service;
 
-import com.contenthub.transcription.adapter.out.persistence.TranscriptRepository;
 import com.contenthub.transcription.application.port.in.TranscribeMediaUseCase;
 import com.contenthub.transcription.application.port.out.AsrPort;
+import com.contenthub.transcription.application.port.out.TranscriptPersistencePort;
 import com.contenthub.transcription.domain.model.Transcript;
 import com.contenthub.transcription.domain.model.TranscriptSegment;
+import com.contenthub.transcription.domain.model.TranscriptStatus;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -18,15 +20,10 @@ import java.util.UUID;
 public class TranscriptionService implements TranscribeMediaUseCase {
 
     private final AsrPort asrPort;
-    private final TranscriptRepository transcriptRepository;
+    private final TranscriptPersistencePort transcriptPersistencePort;
 
     @Override
     public void transcribe(UUID mediaId, UUID workspaceId, String s3Key, String s3Bucket, String traceId) {
-        if (transcriptRepository.findByMediaAssetId(mediaId).isPresent()) {
-            log.info("Transcript already exists for mediaId={}, skipping (idempotent)", mediaId);
-            return;
-        }
-
         log.info("Starting transcription for mediaId={} traceId={}", mediaId, traceId);
         List<TranscriptSegment> segments = asrPort.transcribe(s3Bucket, s3Key);
 
@@ -35,11 +32,16 @@ public class TranscriptionService implements TranscribeMediaUseCase {
                 .workspaceId(workspaceId)
                 .provider("mock")
                 .language("en")
-                .status("completed")
+                .status(TranscriptStatus.COMPLETED)
                 .segments(segments)
                 .build();
 
-        transcriptRepository.save(transcript);
-        log.info("Transcription completed for mediaId={}", mediaId);
+        try {
+            transcriptPersistencePort.save(transcript);
+            log.info("Transcription completed for mediaId={}", mediaId);
+        } catch (DuplicateKeyException e) {
+            // unique index on mediaAssetId — duplicate delivery, safe to ignore
+            log.info("Transcript already exists for mediaId={}, skipping (idempotent)", mediaId);
+        }
     }
 }
