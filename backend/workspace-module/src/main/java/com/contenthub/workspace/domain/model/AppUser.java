@@ -1,12 +1,9 @@
-package com.contenthub.media.domain.model;
+package com.contenthub.workspace.domain.model;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-import jakarta.persistence.Version;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -17,27 +14,33 @@ import java.time.Instant;
 import java.util.UUID;
 
 @Entity
-@Table(name = "edit_decision_list")
+@Table(name = "app_user")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class EditDecisionList {
+public class AppUser {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
     @Column(columnDefinition = "uuid", updatable = false, nullable = false)
     private UUID id;
 
-    @Column(name = "card_id", nullable = false, columnDefinition = "uuid")
-    private UUID cardId;
+    @Column(name = "cognito_sub", nullable = false, unique = true)
+    private String cognitoSub;
 
-    @Column(name = "workspace_id", nullable = false, columnDefinition = "uuid")
-    private UUID workspaceId;
+    @Column(columnDefinition = "citext", nullable = false, unique = true)
+    private String email;
 
-    @Version
-    private long version;
+    @Column(name = "display_name", nullable = false)
+    private String displayName;
+
+    @Column(name = "avatar_url")
+    private String avatarUrl;
+
+    @Column(name = "created_at", nullable = false, updatable = false)
+    @Builder.Default
+    private Instant createdAt = Instant.now();
 
     @Column(name = "updated_at", nullable = false)
     @Builder.Default
