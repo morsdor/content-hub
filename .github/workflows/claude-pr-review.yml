@@ -1,18 +1,28 @@
 name: claude-pr-review
 
-# Fires on every PR targeting develop — not on develop→main promotion PRs.
-# Claude posts a structured review comment; a human then reviews + approves.
+# Automatic: fires on every PR opened/updated targeting develop.
+# Manual: fires when anyone posts "@claude review" in a PR comment.
+# NOT triggered on develop→main promotion PRs (those are human-reviewed).
 on:
   pull_request:
     branches: [develop]
     types: [opened, synchronize, reopened]
+  issue_comment:
+    types: [created]
 
 jobs:
   review:
     name: Claude PR review
+    # Auto-run on PR events; manual run only when "@claude review" appears in a PR comment.
+    # The issue_comment guard prevents running on issue comments (non-PR) or unrelated phrases.
+    if: |
+      github.event_name == 'pull_request' ||
+      (github.event_name == 'issue_comment' &&
+       github.event.issue.pull_request != null &&
+       contains(github.event.comment.body, '@claude review'))
     runs-on: ubuntu-latest
     permissions:
-      pull-requests: write         # needed to post the review comment
+      pull-requests: write         # post the review comment
       contents: read
       id-token: write
 
