@@ -1,0 +1,179 @@
+name: ci
+
+on:
+  pull_request:
+    branches: [develop, main]      # feature→develop PRs + develop→main promotion PRs
+  push:
+    branches: [develop, main]      # image publish gate fires only on these two branches
+  workflow_dispatch:               # allow manual trigger for debugging
+
+env:
+  JAVA_VERSION: '21'
+  IMAGE_NAME: contenthub-app
+
+jobs:
+  # ── Verify ─────────────────────────────────────────────────────────────────
+  # All checks that don't require AWS credentials. Runs on every PR + push.
+  verify:
+    name: Verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0           # SonarCloud needs full git history for blame + new-code detection
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: maven             # caches ~/.m2 between runs; speeds up subsequent jobs significantly
+
+      # ── Style ───────────────────────────────────────────────────────────────
+      - name: Lint — Spotless (Java)
+        run: mvn -f backend/pom.xml spotless:check --no-transfer-progress
+
+      - name: Lint — ESLint + Prettier (frontend)
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run lint
+          npm run format:check
+
+      # ── Architecture boundaries ─────────────────────────────────────────────
+      - name: Architecture tests (ArchUnit — no cross-module DB access)
+        run: mvn -f backend/pom.xml test -pl shared-kernel -Dtest="*ArchTest" --no-transfer-progress
+
+      # ── Unit tests + coverage ───────────────────────────────────────────────
+      - name: Unit tests (JUnit 5)
+        run: mvn -f backend/pom.xml test -P unit --no-transfer-progress
+
+      - name: Unit tests (Vitest — frontend)
+        working-directory: frontend
+        run: npm run test:unit -- --reporter=verbose
+
+      # ── Secret scan ─────────────────────────────────────────────────────────
+      - name: Secret scan (gitleaks)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # ── SCA: dependency CVE scan ─────────────────────────────────────────────
+      - name: SCA — Snyk OSS (blocks on High/Critical CVEs)
+        uses: snyk/actions/maven@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: >-
+            --severity-threshold=high
+            --file=backend/pom.xml
+
+      # ── SAST + quality gate ──────────────────────────────────────────────────
+      - name: SAST + quality gate (SonarCloud)
+        uses: SonarSource/sonarcloud-github-action@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN:  ${{ secrets.SONAR_TOKEN }}
+        with:
+          projectBaseDir: backend
+
+      # ── Build ────────────────────────────────────────────────────────────────
+      - name: Build — Maven package
+        run: mvn -f backend/pom.xml package -DskipTests --no-transfer-progress
+
+      - name: Build — Vite frontend bundle
+        working-directory: frontend
+        run: npm run build
+
+      # ── Contract tests ───────────────────────────────────────────────────────
+      - name: Contract tests — Spring Cloud Contract (svc↔svc)
+        run: mvn -f backend/pom.xml spring-cloud-contract:generateTests verify -P contract --no-transfer-progress
+
+      - name: Contract tests — Pact (frontend↔API)
+        run: mvn -f backend/pom.xml pact:verify --no-transfer-progress
+
+      # ── Kafka schema compatibility ───────────────────────────────────────────
+      - name: Schema compatibility (Confluent Schema Registry Maven plugin)
+        run: mvn -f backend/pom.xml schema-registry:validate --no-transfer-progress
+
+      # ── Integration tests (Testcontainers spins up real PG / Mongo / Kafka) ──
+      - name: Integration tests
+        run: mvn -f backend/pom.xml verify -P integration --no-transfer-progress
+
+      # ── Container image build + CVE scan ────────────────────────────────────
+      - name: Build container image (Spring Boot Buildpacks)
+        run: >-
+          mvn -f backend/pom.xml spring-boot:build-image
+          -DskipTests
+          -Dspring-boot.build-image.imageName=${{ env.IMAGE_NAME }}:${{ github.sha }}
+          --no-transfer-progress
+
+      - name: Scan image for CVEs (Trivy — blocks on CRITICAL/HIGH)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.IMAGE_NAME }}:${{ github.sha }}
+          format: table
+          exit-code: '1'
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+
+      # ── Save image for publish job ───────────────────────────────────────────
+      - name: Save image tar
+        if: github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main'
+        run: docker save ${{ env.IMAGE_NAME }}:${{ github.sha }} | gzip > /tmp/image.tar.gz
+
+      - name: Upload image artifact
+        if: github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: container-image
+          path: /tmp/image.tar.gz
+          retention-days: 1        # ephemeral; only needed for the publish job in this run
+
+  # ── Publish ────────────────────────────────────────────────────────────────
+  # Pushes the proven image to ECR. Only runs after verify passes, only on
+  # develop and main (not on PRs). Uses OIDC — no static AWS credentials stored.
+  publish:
+    name: Publish to ECR
+    needs: verify
+    if: github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write              # required for AWS OIDC token exchange
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: container-image
+          path: /tmp
+
+      - name: Load image
+        run: docker load < /tmp/image.tar.gz
+
+      # ── AWS credentials via OIDC — no static keys ────────────────────────────
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_CI_ROLE_ARN }}
+          aws-region:     ${{ vars.AWS_REGION }}
+
+      - name: Log in to Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # ── Push by sha tag + update :develop or :latest tag ─────────────────────
+      - name: Push image (immutable sha tag)
+        env:
+          ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+        run: |
+          docker tag ${{ env.IMAGE_NAME }}:${{ github.sha }} \
+            $ECR_REGISTRY/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          docker push $ECR_REGISTRY/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          echo "IMAGE_DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' \
+            $ECR_REGISTRY/${{ env.IMAGE_NAME }}:${{ github.sha }} | cut -d@ -f2)" >> $GITHUB_ENV
+
+      - name: Print pushed digest
+        run: echo "Pushed ${{ env.IMAGE_NAME }}@${{ env.IMAGE_DIGEST }}"

@@ -7,10 +7,15 @@
 #   make logs      ← tail all container output
 #   make dev-down  ← stop (volumes preserved)
 
-.PHONY: help doctor dev-up dev-down dev-restart logs status migrate seed clean clean-force
+.PHONY: help doctor dev-up dev-down dev-restart logs status migrate seed clean clean-force \
+        backend-build backend-test backend-run
 
-COMPOSE  := docker compose
-ENV_FILE := .env.local
+COMPOSE     := docker compose
+ENV_FILE    := .env.local
+# macOS ships Homebrew openjdk alongside Oracle JDK 21.
+# Lombok and Spring Boot 3.4 require JDK 21; pin Maven to it explicitly.
+JAVA21_HOME := /Library/Java/JavaVirtualMachines/jdk-21.jdk/Contents/Home
+MAVEN       := JAVA_HOME=$(JAVA21_HOME) mvn
 
 # Load .env.local so Make can reference variables in echo output.
 # The dash suppresses "file not found" — if missing, run: cp .env.local.example .env.local
@@ -88,7 +93,20 @@ logs:
 status:
 	$(COMPOSE) --env-file $(ENV_FILE) ps
 
-# ── App lifecycle (placeholders — implemented with the app skeleton) ───────────
+# ── Backend build ─────────────────────────────────────────────────────────────
+
+backend-build:
+	$(MAVEN) -f backend/pom.xml compile -q
+
+backend-test:
+	$(MAVEN) -f backend/pom.xml test
+
+backend-run:
+	$(MAVEN) -f backend/pom.xml -pl app spring-boot:run \
+	  -Dspring-boot.run.profiles=dev \
+	  -Dspring-boot.run.jvmArguments="-Dspring.profiles.active=dev"
+
+# ── App lifecycle ─────────────────────────────────────────────────────────────
 
 migrate:
 	@echo "Flyway runs automatically at startup (spring.flyway.enabled=true in the dev profile)."

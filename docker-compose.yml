@@ -21,13 +21,13 @@ services:
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     environment:
-      POSTGRES_USER:     ${POSTGRES_USER:-contenthub}
+      POSTGRES_USER: ${POSTGRES_USER:-contenthub}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-contenthub}
-      POSTGRES_DB:       ${POSTGRES_DB:-contenthub}
+      POSTGRES_DB: ${POSTGRES_DB:-contenthub}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-contenthub}"]
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-contenthub}" ]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -41,11 +41,11 @@ services:
     environment:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:-contenthub}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:-contenthub}
-      MONGO_INITDB_DATABASE:      ${MONGO_DB:-contenthub}
+      MONGO_INITDB_DATABASE: ${MONGO_DB:-contenthub}
     volumes:
       - mongo_data:/data/db
     healthcheck:
-      test: ["CMD-SHELL", "mongosh --quiet --eval 'db.adminCommand(\"ping\").ok'"]
+      test: [ "CMD-SHELL", "mongosh --quiet --eval 'db.adminCommand(\"ping\").ok'" ]
       interval: 10s
       timeout: 10s
       retries: 5
@@ -63,16 +63,16 @@ services:
       - "2181:2181"
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
-      ZOOKEEPER_TICK_TIME:   2000
+      ZOOKEEPER_TICK_TIME: 2000
     volumes:
       - zookeeper_data:/var/lib/zookeeper/data
       - zookeeper_log:/var/lib/zookeeper/log
     healthcheck:
-      test: ["CMD-SHELL", "echo ruok | nc localhost 2181 | grep imok"]
+      test: [ "CMD-SHELL", "curl -sf http://localhost:8080/commands/ruok || exit 1" ]
       interval: 10s
       timeout: 5s
-      retries: 5
-      start_period: 10s
+      retries: 10
+      start_period: 30s
     restart: unless-stopped
 
   kafka:
@@ -85,22 +85,22 @@ services:
       # 9092  → container-to-container (Schema Registry, kafka-init, etc.)
       - "${KAFKA_HOST_PORT:-29092}:29092"
     environment:
-      KAFKA_BROKER_ID:    1
+      KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_LISTENERS:                       PLAINTEXT://0.0.0.0:9092,PLAINTEXT_HOST://0.0.0.0:29092
-      KAFKA_ADVERTISED_LISTENERS:            PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,PLAINTEXT_HOST://0.0.0.0:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
-      KAFKA_INTER_BROKER_LISTENER_NAME:     PLAINTEXT
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR:         1
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
-      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR:            1
-      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS:         0
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
-      KAFKA_LOG_RETENTION_HOURS:       24      # keep short locally; prod uses 7d (MSK default)
+      KAFKA_LOG_RETENTION_HOURS: 24 # keep short locally; prod uses 7d (MSK default)
     volumes:
       - kafka_data:/var/lib/kafka/data
     healthcheck:
-      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092 >/dev/null 2>&1"]
+      test: [ "CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092 >/dev/null 2>&1" ]
       interval: 10s
       timeout: 10s
       retries: 10
@@ -115,11 +115,11 @@ services:
     ports:
       - "${SCHEMA_REGISTRY_PORT:-8081}:8081"
     environment:
-      SCHEMA_REGISTRY_HOST_NAME:                    schema-registry
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
       SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: kafka:9092
-      SCHEMA_REGISTRY_LISTENERS:                    http://0.0.0.0:8081
+      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:8081/subjects >/dev/null 2>&1"]
+      test: [ "CMD-SHELL", "curl -sf http://localhost:8081/subjects >/dev/null 2>&1" ]
       interval: 10s
       timeout: 10s
       retries: 5
@@ -133,7 +133,7 @@ services:
     depends_on:
       kafka:
         condition: service_healthy
-    entrypoint: ["/bin/bash", "-c"]
+    entrypoint: [ "/bin/bash", "-c" ]
     command:
       - |
         echo "Creating ContentHub Kafka topics..."
@@ -164,16 +164,16 @@ services:
     ports:
       - "${LOCALSTACK_PORT:-4566}:4566"
     environment:
-      SERVICES:           s3,sts,iam
+      SERVICES: s3,sts,iam
       AWS_DEFAULT_REGION: ${AWS_REGION:-us-east-1}
-      PERSISTENCE:        1
+      PERSISTENCE: 1
       # Optional: set LOCALSTACK_AUTH_TOKEN in .env.local to unlock Pro features
       LOCALSTACK_AUTH_TOKEN: ${LOCALSTACK_AUTH_TOKEN:-}
     volumes:
       - localstack_data:/var/lib/localstack
       - /var/run/docker.sock:/var/run/docker.sock
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:4566/_localstack/health"]
+      test: [ "CMD-SHELL", "curl -sf http://localhost:4566/_localstack/health" ]
       interval: 10s
       timeout: 10s
       retries: 10
@@ -182,15 +182,15 @@ services:
 
   # One-shot: creates the S3 buckets the app expects. Idempotent (2>/dev/null || true).
   localstack-init:
-    image: amazon/aws-cli:2
+    image: amazon/aws-cli
     depends_on:
       localstack:
         condition: service_healthy
     environment:
-      AWS_ACCESS_KEY_ID:     ${AWS_ACCESS_KEY_ID:-local}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-local}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-local}
-      AWS_DEFAULT_REGION:    ${AWS_REGION:-us-east-1}
-    entrypoint: ["/bin/sh", "-c"]
+      AWS_DEFAULT_REGION: ${AWS_REGION:-us-east-1}
+    entrypoint: [ "/bin/sh", "-c" ]
     command:
       - |
         echo "Creating S3 buckets in LocalStack..."
@@ -250,9 +250,9 @@ services:
     depends_on:
       - jaeger
     ports:
-      - "4317:4317"   # OTLP gRPC  — configure OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317
-      - "4318:4318"   # OTLP HTTP  — alternative ingestion
-      - "8889:8889"   # Prometheus exporter (OTel-internal metrics)
+      - "4317:4317" # OTLP gRPC  — configure OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317
+      - "4318:4318" # OTLP HTTP  — alternative ingestion
+      - "8889:8889" # Prometheus exporter (OTel-internal metrics)
     volumes:
       - ./infra/local/otel/otel-collector-config.yml:/etc/otelcol-contrib/config.yaml:ro
     restart: unless-stopped
@@ -290,11 +290,11 @@ services:
       - prometheus
       - jaeger
     ports:
-      - "${GRAFANA_PORT:-3001}:3000"   # 3000 is reserved for the React SPA
+      - "${GRAFANA_PORT:-3001}:3000" # 3000 is reserved for the React SPA
     environment:
-      GF_SECURITY_ADMIN_USER:     admin
+      GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: admin
-      GF_AUTH_ANONYMOUS_ENABLED:  "true"
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
       GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
     volumes:
       - grafana_data:/var/lib/grafana

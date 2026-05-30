@@ -1,0 +1,85 @@
+name: qa-deploy
+
+# Deploys to an ephemeral AWS QA stack on every merge to develop, runs the
+# acceptance suite against it, then destroys it. Costs ~$1–2 per run.
+#
+# STATUS: PAUSED — set DEPLOY_QA_ENABLED repository variable to "true" only
+# after all prerequisites in docs/08-deployment-cicd.md §2.2 are complete:
+#   1. AWS OIDC provider created in IAM console (one-time per AWS account)
+#   2. IAM role with trust policy scoped to this repo + develop branch
+#   3. Terraform state backend: S3 bucket + DynamoDB table (create manually once)
+#   4. Terraform modules written (infra/envs/qa/ must have working main.tf)
+#   5. GitHub secrets/variables set: AWS_QA_ROLE_ARN, TF_STATE_BUCKET, AWS_REGION
+on:
+  push:
+    branches: [develop]
+
+permissions:
+  id-token: write                  # required for AWS OIDC token exchange
+  contents: read
+
+jobs:
+  deploy-qa:
+    name: Deploy ephemeral QA + acceptance tests
+    # Controlled by a GitHub repository variable (Settings → Variables → Repository variables).
+    # Set DEPLOY_QA_ENABLED = true there to enable. Not set = disabled.
+    if: vars.DEPLOY_QA_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    environment: qa                # GitHub Environment gate — add protection rules / reviewers here
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # ── AWS credentials via OIDC — short-lived token, nothing to rotate ──────
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_QA_ROLE_ARN }}
+          aws-region:     ${{ vars.AWS_REGION }}
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~1.8"
+          terraform_wrapper: true  # wraps terraform so outputs are captured as step outputs
+
+      # ── Spin up the ephemeral QA stack ───────────────────────────────────────
+      - name: Terraform init
+        working-directory: infra/envs/qa
+        run: |
+          terraform init \
+            -backend-config="bucket=${{ vars.TF_STATE_BUCKET }}" \
+            -backend-config="key=qa/terraform.tfstate" \
+            -backend-config="region=${{ vars.AWS_REGION }}"
+
+      - name: Terraform apply (spin up QA)
+        id: tf-apply
+        working-directory: infra/envs/qa
+        run: |
+          terraform apply -auto-approve \
+            -var="image_tag=${{ github.sha }}" \
+            -var="environment=qa"
+          echo "app_url=$(terraform output -raw app_url)" >> $GITHUB_OUTPUT
+
+      # ── Run acceptance suite against the live QA stack ───────────────────────
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Load tests + BDD suite (BlazeMeter / Cucumber)
+        run: |
+          mvn -f backend/pom.xml verify -P qa-acceptance \
+            -Denv.base-url=${{ steps.tf-apply.outputs.app_url }} \
+            --no-transfer-progress
+
+      # ── Tear down — always runs even if tests fail ───────────────────────────
+      # if: always() is load-bearing — skipping destroy leaves a running AWS stack burning money.
+      - name: Terraform destroy (always — prevent orphaned stacks)
+        if: always()
+        working-directory: infra/envs/qa
+        run: |
+          terraform destroy -auto-approve \
+            -var="image_tag=${{ github.sha }}" \
+            -var="environment=qa"
