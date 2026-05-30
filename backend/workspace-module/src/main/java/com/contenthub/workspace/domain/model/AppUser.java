@@ -22,27 +22,27 @@ import java.util.UUID;
 @Builder
 public class AppUser {
 
-    @Id
-    @Column(columnDefinition = "uuid", updatable = false, nullable = false)
-    private UUID id;
+	@Id
+	@Column(columnDefinition = "uuid", updatable = false, nullable = false)
+	private UUID id;
 
-    @Column(name = "cognito_sub", nullable = false, unique = true)
-    private String cognitoSub;
+	@Column(name = "cognito_sub", nullable = false, unique = true)
+	private String cognitoSub;
 
-    @Column(columnDefinition = "citext", nullable = false, unique = true)
-    private String email;
+	@Column(columnDefinition = "citext", nullable = false, unique = true)
+	private String email;
 
-    @Column(name = "display_name", nullable = false)
-    private String displayName;
+	@Column(name = "display_name", nullable = false)
+	private String displayName;
 
-    @Column(name = "avatar_url")
-    private String avatarUrl;
+	@Column(name = "avatar_url")
+	private String avatarUrl;
 
-    @Column(name = "created_at", nullable = false, updatable = false)
-    @Builder.Default
-    private Instant createdAt = Instant.now();
+	@Column(name = "created_at", nullable = false, updatable = false)
+	@Builder.Default
+	private Instant createdAt = Instant.now();
 
-    @Column(name = "updated_at", nullable = false)
-    @Builder.Default
-    private Instant updatedAt = Instant.now();
+	@Column(name = "updated_at", nullable = false)
+	@Builder.Default
+	private Instant updatedAt = Instant.now();
 }

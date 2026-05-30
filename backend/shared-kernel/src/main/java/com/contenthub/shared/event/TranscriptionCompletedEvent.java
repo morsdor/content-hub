@@ -13,10 +13,10 @@ import java.util.UUID;
 @AllArgsConstructor
 public class TranscriptionCompletedEvent {
 
-    public static final String TOPIC = "transcription.completed";
+	public static final String TOPIC = "transcription.completed";
 
-    private UUID mediaId;
-    private String transcriptId;
-    private UUID workspaceId;
-    private String traceId;
+	private UUID mediaId;
+	private String transcriptId;
+	private UUID workspaceId;
+	private String traceId;
 }

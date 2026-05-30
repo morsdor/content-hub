@@ -7,8 +7,8 @@ import lombok.Value;
 @Builder
 public class TranscriptWord {
 
-    String word;
-    int startMs;
-    int endMs;
-    double confidence;
+	String word;
+	int startMs;
+	int endMs;
+	double confidence;
 }

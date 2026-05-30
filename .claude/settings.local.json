@@ -4,7 +4,10 @@
       "Bash(mkdir -p /tmp/pages_extract)",
       "Bash(unzip -o -q \"ContetHub - master plan.pages\" -d /tmp/pages_extract)",
       "Bash(docker compose *)",
-      "Skill(update-config)"
+      "Skill(update-config)",
+      "Read(//Users/mritunjaymohitesh/.m2/repository/com/diffplug/spotless/spotless-lib/**)",
+      "Read(//Users/mritunjaymohitesh/.m2/repository/com/diffplug/spotless/spotless-lib-extra/**)",
+      "Bash(mvn *)"
     ]
   }
 }

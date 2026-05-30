@@ -17,9 +17,9 @@ import java.util.UUID;
 @EqualsAndHashCode
 public class WorkspaceMemberId implements Serializable {
 
-    @Column(name = "workspace_id", columnDefinition = "uuid", nullable = false)
-    private UUID workspaceId;
+	@Column(name = "workspace_id", columnDefinition = "uuid", nullable = false)
+	private UUID workspaceId;
 
-    @Column(name = "user_id", columnDefinition = "uuid", nullable = false)
-    private UUID userId;
+	@Column(name = "user_id", columnDefinition = "uuid", nullable = false)
+	private UUID userId;
 }

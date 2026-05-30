@@ -21,28 +21,26 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class MediaController {
 
-    private final RequestPresignedUploadUseCase requestPresignedUploadUseCase;
-    private final ConfirmUploadUseCase confirmUploadUseCase;
+	private final RequestPresignedUploadUseCase requestPresignedUploadUseCase;
+	private final ConfirmUploadUseCase confirmUploadUseCase;
 
-    @PostMapping("/upload-url")
-    @ResponseStatus(HttpStatus.CREATED)
-    public UploadUrlResponse requestUploadUrl(@Valid @RequestBody UploadUrlRequest request) {
-        var result = requestPresignedUploadUseCase.requestUpload(
-                request.workspaceId(),
-                request.cardId(),
-                request.filename(),
-                request.contentType(),
-                request.sizeBytes());
-        return new UploadUrlResponse(result.mediaId(), result.presignedUrl().toString(), result.s3Key());
-    }
+	@PostMapping("/upload-url")
+	@ResponseStatus(HttpStatus.CREATED)
+	public UploadUrlResponse requestUploadUrl(@Valid @RequestBody UploadUrlRequest request) {
+		var result = requestPresignedUploadUseCase.requestUpload(request.workspaceId(), request.cardId(),
+				request.filename(), request.contentType(), request.sizeBytes());
+		return new UploadUrlResponse(result.mediaId(), result.presignedUrl().toString(), result.s3Key());
+	}
 
-    // Called by the browser after the S3 presigned PUT succeeds.
-    // Transitions the asset UPLOADING → UPLOADED and writes the video.uploaded outbox entry.
-    @PatchMapping("/{mediaId}/confirm-upload")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void confirmUpload(@PathVariable UUID mediaId, Principal principal) {
-        UUID callerUserId = UUID.fromString(principal.getName());
-        // Trace ID: proper OTel propagation wired in Phase 1; UUID placeholder for Phase 0
-        confirmUploadUseCase.confirmUpload(mediaId, callerUserId, UUID.randomUUID().toString());
-    }
+	// Called by the browser after the S3 presigned PUT succeeds.
+	// Transitions the asset UPLOADING → UPLOADED and writes the video.uploaded
+	// outbox entry.
+	@PatchMapping("/{mediaId}/confirm-upload")
+	@ResponseStatus(HttpStatus.NO_CONTENT)
+	public void confirmUpload(@PathVariable UUID mediaId, Principal principal) {
+		UUID callerUserId = UUID.fromString(principal.getName());
+		// Trace ID: proper OTel propagation wired in Phase 1; UUID placeholder for
+		// Phase 0
+		confirmUploadUseCase.confirmUpload(mediaId, callerUserId, UUID.randomUUID().toString());
+	}
 }

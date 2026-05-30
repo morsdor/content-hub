@@ -16,8 +16,8 @@ import lombok.Setter;
 import java.util.UUID;
 
 @Entity
-@Table(name = "edl_segment",
-        uniqueConstraints = @UniqueConstraint(name = "idx_edl_seq", columnNames = {"edl_id", "seq"}))
+@Table(name = "edl_segment", uniqueConstraints = @UniqueConstraint(name = "idx_edl_seq", columnNames = {"edl_id",
+		"seq"}))
 @Getter
 @Setter
 @NoArgsConstructor
@@ -25,23 +25,23 @@ import java.util.UUID;
 @Builder
 public class EdlSegment {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    @Column(columnDefinition = "uuid", updatable = false, nullable = false)
-    private UUID id;
+	@Id
+	@GeneratedValue(strategy = GenerationType.UUID)
+	@Column(columnDefinition = "uuid", updatable = false, nullable = false)
+	private UUID id;
 
-    @Column(name = "edl_id", nullable = false, columnDefinition = "uuid")
-    private UUID edlId;
+	@Column(name = "edl_id", nullable = false, columnDefinition = "uuid")
+	private UUID edlId;
 
-    @Column(name = "media_asset_id", nullable = false, columnDefinition = "uuid")
-    private UUID mediaAssetId;
+	@Column(name = "media_asset_id", nullable = false, columnDefinition = "uuid")
+	private UUID mediaAssetId;
 
-    @Column(nullable = false)
-    private int seq;
+	@Column(nullable = false)
+	private int seq;
 
-    @Column(name = "source_start_ms", nullable = false)
-    private int sourceStartMs;
+	@Column(name = "source_start_ms", nullable = false)
+	private int sourceStartMs;
 
-    @Column(name = "source_end_ms", nullable = false)
-    private int sourceEndMs;
+	@Column(name = "source_end_ms", nullable = false)
+	private int sourceEndMs;
 }

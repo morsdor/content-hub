@@ -8,7 +8,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @EnableScheduling
 public class ContentHubApplication {
 
-    public static void main(String[] args) {
-        SpringApplication.run(ContentHubApplication.class, args);
-    }
+	public static void main(String[] args) {
+		SpringApplication.run(ContentHubApplication.class, args);
+	}
 }

@@ -7,7 +7,7 @@ import java.util.UUID;
 
 public interface MediaPersistencePort {
 
-    MediaAsset save(MediaAsset asset);
+	MediaAsset save(MediaAsset asset);
 
-    Optional<MediaAsset> findById(UUID id);
+	Optional<MediaAsset> findById(UUID id);
 }

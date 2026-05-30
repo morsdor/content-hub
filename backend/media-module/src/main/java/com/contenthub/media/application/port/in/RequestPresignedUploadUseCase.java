@@ -5,8 +5,8 @@ import java.util.UUID;
 
 public interface RequestPresignedUploadUseCase {
 
-    record PresignedUpload(UUID mediaId, URL presignedUrl, String s3Key) {}
+	record PresignedUpload(UUID mediaId, URL presignedUrl, String s3Key) {
+	}
 
-    PresignedUpload requestUpload(UUID workspaceId, UUID cardId,
-                                  String filename, String contentType, long sizeBytes);
+	PresignedUpload requestUpload(UUID workspaceId, UUID cardId, String filename, String contentType, long sizeBytes);
 }

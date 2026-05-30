@@ -19,22 +19,22 @@ import java.util.UUID;
 @Builder
 public class Transcript {
 
-    @Id
-    private String id;
+	@Id
+	private String id;
 
-    @Indexed(unique = true)
-    private UUID mediaAssetId;
+	@Indexed(unique = true)
+	private UUID mediaAssetId;
 
-    private UUID workspaceId;
-    private String provider;
-    private String language;
-    private long durationMs;
+	private UUID workspaceId;
+	private String provider;
+	private String language;
+	private long durationMs;
 
-    @Builder.Default
-    private TranscriptStatus status = TranscriptStatus.PROCESSING;
+	@Builder.Default
+	private TranscriptStatus status = TranscriptStatus.PROCESSING;
 
-    private List<TranscriptSegment> segments;
+	private List<TranscriptSegment> segments;
 
-    @Builder.Default
-    private Instant createdAt = Instant.now();
+	@Builder.Default
+	private Instant createdAt = Instant.now();
 }

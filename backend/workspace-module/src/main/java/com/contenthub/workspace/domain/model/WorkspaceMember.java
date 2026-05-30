@@ -21,13 +21,13 @@ import java.time.Instant;
 @Builder
 public class WorkspaceMember {
 
-    @EmbeddedId
-    private WorkspaceMemberId id;
+	@EmbeddedId
+	private WorkspaceMemberId id;
 
-    @Column(nullable = false)
-    private String role;
+	@Column(nullable = false)
+	private String role;
 
-    @Column(name = "created_at", nullable = false, updatable = false)
-    @Builder.Default
-    private Instant createdAt = Instant.now();
+	@Column(name = "created_at", nullable = false, updatable = false)
+	@Builder.Default
+	private Instant createdAt = Instant.now();
 }

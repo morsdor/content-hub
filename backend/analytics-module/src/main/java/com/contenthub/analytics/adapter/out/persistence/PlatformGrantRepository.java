@@ -9,7 +9,7 @@ import java.util.UUID;
 
 public interface PlatformGrantRepository extends JpaRepository<PlatformGrant, UUID> {
 
-    List<PlatformGrant> findByWorkspaceId(UUID workspaceId);
+	List<PlatformGrant> findByWorkspaceId(UUID workspaceId);
 
-    Optional<PlatformGrant> findByWorkspaceIdAndPlatform(UUID workspaceId, String platform);
+	Optional<PlatformGrant> findByWorkspaceIdAndPlatform(UUID workspaceId, String platform);
 }

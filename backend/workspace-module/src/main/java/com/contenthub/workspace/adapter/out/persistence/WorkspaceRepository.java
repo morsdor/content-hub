@@ -9,5 +9,5 @@ import java.util.UUID;
 
 public interface WorkspaceRepository extends JpaRepository<Workspace, UUID>, WorkspacePersistencePort {
 
-    List<Workspace> findByCreatedByAndDeletedAtIsNull(UUID createdBy);
+	List<Workspace> findByCreatedByAndDeletedAtIsNull(UUID createdBy);
 }
