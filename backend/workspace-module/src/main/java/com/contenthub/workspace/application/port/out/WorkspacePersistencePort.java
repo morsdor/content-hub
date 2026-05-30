@@ -7,7 +7,7 @@ import java.util.UUID;
 
 public interface WorkspacePersistencePort {
 
-    Workspace save(Workspace workspace);
+	Workspace save(Workspace workspace);
 
-    Optional<Workspace> findById(UUID id);
+	Optional<Workspace> findById(UUID id);
 }

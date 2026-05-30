@@ -9,9 +9,9 @@ import java.util.List;
 @Builder
 public class TranscriptSegment {
 
-    String speaker;
-    int startMs;
-    int endMs;
-    String text;
-    List<TranscriptWord> words;
+	String speaker;
+	int startMs;
+	int endMs;
+	String text;
+	List<TranscriptWord> words;
 }

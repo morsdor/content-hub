@@ -15,52 +15,46 @@ import java.net.URI;
 @Configuration
 public class AwsConfiguration {
 
-    @Value("${aws.region:us-east-1}")
-    private String region;
+	@Value("${aws.region:us-east-1}")
+	private String region;
 
-    @Value("${aws.access-key-id:local}")
-    private String accessKeyId;
+	@Value("${aws.access-key-id:local}")
+	private String accessKeyId;
 
-    @Value("${aws.secret-access-key:local}")
-    private String secretAccessKey;
+	@Value("${aws.secret-access-key:local}")
+	private String secretAccessKey;
 
-    @Value("${aws.endpoint-url:}")
-    private String endpointUrl;
+	@Value("${aws.endpoint-url:}")
+	private String endpointUrl;
 
-    @Bean
-    public S3Client s3Client() {
-        var builder = S3Client.builder()
-                .region(Region.of(region))
-                .credentialsProvider(resolveCredentials());
+	@Bean
+	public S3Client s3Client() {
+		var builder = S3Client.builder().region(Region.of(region)).credentialsProvider(resolveCredentials());
 
-        if (!endpointUrl.isBlank()) {
-            builder.endpointOverride(URI.create(endpointUrl))
-                   .forcePathStyle(true);
-        }
+		if (!endpointUrl.isBlank()) {
+			builder.endpointOverride(URI.create(endpointUrl)).forcePathStyle(true);
+		}
 
-        return builder.build();
-    }
+		return builder.build();
+	}
 
-    @Bean
-    public S3Presigner s3Presigner() {
-        var builder = S3Presigner.builder()
-                .region(Region.of(region))
-                .credentialsProvider(resolveCredentials());
+	@Bean
+	public S3Presigner s3Presigner() {
+		var builder = S3Presigner.builder().region(Region.of(region)).credentialsProvider(resolveCredentials());
 
-        if (!endpointUrl.isBlank()) {
-            builder.endpointOverride(URI.create(endpointUrl));
-        }
+		if (!endpointUrl.isBlank()) {
+			builder.endpointOverride(URI.create(endpointUrl));
+		}
 
-        return builder.build();
-    }
+		return builder.build();
+	}
 
-    // LocalStack (endpointUrl set) uses static creds — any value works.
-    // Real AWS uses the default chain: IRSA → instance profile → env vars → ~/.aws
-    private software.amazon.awssdk.auth.credentials.AwsCredentialsProvider resolveCredentials() {
-        if (!endpointUrl.isBlank()) {
-            return StaticCredentialsProvider.create(
-                    AwsBasicCredentials.create(accessKeyId, secretAccessKey));
-        }
-        return DefaultCredentialsProvider.create();
-    }
+	// LocalStack (endpointUrl set) uses static creds — any value works.
+	// Real AWS uses the default chain: IRSA → instance profile → env vars → ~/.aws
+	private software.amazon.awssdk.auth.credentials.AwsCredentialsProvider resolveCredentials() {
+		if (!endpointUrl.isBlank()) {
+			return StaticCredentialsProvider.create(AwsBasicCredentials.create(accessKeyId, secretAccessKey));
+		}
+		return DefaultCredentialsProvider.create();
+	}
 }

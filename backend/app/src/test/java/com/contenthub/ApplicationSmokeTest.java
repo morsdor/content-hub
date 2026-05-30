@@ -22,35 +22,33 @@ import static org.assertj.core.api.Assertions.assertThat;
 @ActiveProfiles("test")
 class ApplicationSmokeTest {
 
-    @SuppressWarnings("resource") // lifecycle managed by @Container
-    @Container
-    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine")
-            .withDatabaseName("contenthub_test")
-            .withUsername("contenthub")
-            .withPassword("contenthub");
+	@SuppressWarnings("resource") // lifecycle managed by @Container
+	@Container
+	static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine")
+			.withDatabaseName("contenthub_test").withUsername("contenthub").withPassword("contenthub");
 
-    @Container
-    static MongoDBContainer mongo = new MongoDBContainer("mongo:7.0");
+	@Container
+	static MongoDBContainer mongo = new MongoDBContainer("mongo:7.0");
 
-    @Container
-    static KafkaContainer kafka = new KafkaContainer("confluentinc/cp-kafka:7.6.1");
+	@Container
+	static KafkaContainer kafka = new KafkaContainer("confluentinc/cp-kafka:7.6.1");
 
-    @DynamicPropertySource
-    static void configureProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url", postgres::getJdbcUrl);
-        registry.add("spring.datasource.username", postgres::getUsername);
-        registry.add("spring.datasource.password", postgres::getPassword);
-        registry.add("spring.data.mongodb.uri", mongo::getReplicaSetUrl);
-        registry.add("spring.kafka.bootstrap-servers", kafka::getBootstrapServers);
-    }
+	@DynamicPropertySource
+	static void configureProperties(DynamicPropertyRegistry registry) {
+		registry.add("spring.datasource.url", postgres::getJdbcUrl);
+		registry.add("spring.datasource.username", postgres::getUsername);
+		registry.add("spring.datasource.password", postgres::getPassword);
+		registry.add("spring.data.mongodb.uri", mongo::getReplicaSetUrl);
+		registry.add("spring.kafka.bootstrap-servers", kafka::getBootstrapServers);
+	}
 
-    @Autowired
-    private TestRestTemplate restTemplate;
+	@Autowired
+	private TestRestTemplate restTemplate;
 
-    @Test
-    void actuatorHealthIsUp() {
-        ResponseEntity<String> response = restTemplate.getForEntity("/actuator/health", String.class);
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(response.getBody()).contains("\"status\":\"UP\"");
-    }
+	@Test
+	void actuatorHealthIsUp() {
+		ResponseEntity<String> response = restTemplate.getForEntity("/actuator/health", String.class);
+		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+		assertThat(response.getBody()).contains("\"status\":\"UP\"");
+	}
 }

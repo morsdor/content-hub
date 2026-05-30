@@ -6,5 +6,7 @@ import com.contenthub.workspace.domain.model.WorkspaceMemberId;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface WorkspaceMemberRepository
-        extends JpaRepository<WorkspaceMember, WorkspaceMemberId>, MemberPersistencePort {
+		extends
+			JpaRepository<WorkspaceMember, WorkspaceMemberId>,
+			MemberPersistencePort {
 }

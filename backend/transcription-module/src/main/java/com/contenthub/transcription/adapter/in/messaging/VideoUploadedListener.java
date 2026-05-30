@@ -16,30 +16,21 @@ import org.springframework.stereotype.Component;
 @Slf4j
 public class VideoUploadedListener {
 
-    private final TranscribeMediaUseCase transcribeMediaUseCase;
-    private final ObjectMapper objectMapper;
+	private final TranscribeMediaUseCase transcribeMediaUseCase;
+	private final ObjectMapper objectMapper;
 
-    @KafkaListener(
-            topics = "${contenthub.topics.video-uploaded:" + VideoUploadedEvent.TOPIC + "}",
-            groupId = "${spring.kafka.consumer.group-id:contenthub-monolith}"
-    )
-    public void onVideoUploaded(
-            @Payload String payload,
-            @Header(KafkaHeaders.RECEIVED_TOPIC) String topic,
-            @Header(KafkaHeaders.OFFSET) long offset) {
-        log.info("Received {} at offset {}", topic, offset);
-        try {
-            VideoUploadedEvent event = objectMapper.readValue(payload, VideoUploadedEvent.class);
-            transcribeMediaUseCase.transcribe(
-                    event.getMediaId(),
-                    event.getWorkspaceId(),
-                    event.getS3Key(),
-                    event.getS3Bucket(),
-                    event.getTraceId()
-            );
-        } catch (Exception e) {
-            log.error("Failed to process video.uploaded event at offset {}: {}", offset, e.getMessage(), e);
-            throw new RuntimeException("video.uploaded processing failed", e);
-        }
-    }
+	@KafkaListener(topics = "${contenthub.topics.video-uploaded:" + VideoUploadedEvent.TOPIC
+			+ "}", groupId = "${spring.kafka.consumer.group-id:contenthub-monolith}")
+	public void onVideoUploaded(@Payload String payload, @Header(KafkaHeaders.RECEIVED_TOPIC) String topic,
+			@Header(KafkaHeaders.OFFSET) long offset) {
+		log.info("Received {} at offset {}", topic, offset);
+		try {
+			VideoUploadedEvent event = objectMapper.readValue(payload, VideoUploadedEvent.class);
+			transcribeMediaUseCase.transcribe(event.getMediaId(), event.getWorkspaceId(), event.getS3Key(),
+					event.getS3Bucket(), event.getTraceId());
+		} catch (Exception e) {
+			log.error("Failed to process video.uploaded event at offset {}: {}", offset, e.getMessage(), e);
+			throw new RuntimeException("video.uploaded processing failed", e);
+		}
+	}
 }

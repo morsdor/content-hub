@@ -19,8 +19,8 @@ import java.time.Instant;
 import java.util.UUID;
 
 @Entity
-@Table(name = "platform_grant",
-        uniqueConstraints = @UniqueConstraint(columnNames = {"workspace_id", "platform", "external_account_id"}))
+@Table(name = "platform_grant", uniqueConstraints = @UniqueConstraint(columnNames = {"workspace_id", "platform",
+		"external_account_id"}))
 @Getter
 @Setter
 @NoArgsConstructor
@@ -28,35 +28,35 @@ import java.util.UUID;
 @Builder
 public class PlatformGrant {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    @Column(columnDefinition = "uuid", updatable = false, nullable = false)
-    private UUID id;
+	@Id
+	@GeneratedValue(strategy = GenerationType.UUID)
+	@Column(columnDefinition = "uuid", updatable = false, nullable = false)
+	private UUID id;
 
-    @Column(name = "workspace_id", nullable = false, columnDefinition = "uuid")
-    private UUID workspaceId;
+	@Column(name = "workspace_id", nullable = false, columnDefinition = "uuid")
+	private UUID workspaceId;
 
-    @Column(nullable = false)
-    private String platform;
+	@Column(nullable = false)
+	private String platform;
 
-    @Column(name = "external_account_id", nullable = false)
-    private String externalAccountId;
+	@Column(name = "external_account_id", nullable = false)
+	private String externalAccountId;
 
-    @Column(name = "access_token_enc", nullable = false, columnDefinition = "bytea")
-    private byte[] accessTokenEnc;
+	@Column(name = "access_token_enc", nullable = false, columnDefinition = "bytea")
+	private byte[] accessTokenEnc;
 
-    @Column(name = "refresh_token_enc", columnDefinition = "bytea")
-    private byte[] refreshTokenEnc;
+	@Column(name = "refresh_token_enc", columnDefinition = "bytea")
+	private byte[] refreshTokenEnc;
 
-    @JdbcTypeCode(SqlTypes.ARRAY)
-    @Column(columnDefinition = "text[]", nullable = false)
-    @Builder.Default
-    private String[] scopes = new String[0];
+	@JdbcTypeCode(SqlTypes.ARRAY)
+	@Column(columnDefinition = "text[]", nullable = false)
+	@Builder.Default
+	private String[] scopes = new String[0];
 
-    @Column(name = "expires_at")
-    private Instant expiresAt;
+	@Column(name = "expires_at")
+	private Instant expiresAt;
 
-    @Column(name = "created_at", nullable = false, updatable = false)
-    @Builder.Default
-    private Instant createdAt = Instant.now();
+	@Column(name = "created_at", nullable = false, updatable = false)
+	@Builder.Default
+	private Instant createdAt = Instant.now();
 }

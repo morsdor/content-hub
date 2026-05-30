@@ -23,33 +23,33 @@ import java.util.UUID;
 @Builder
 public class Workspace {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    @Column(columnDefinition = "uuid", updatable = false, nullable = false)
-    private UUID id;
+	@Id
+	@GeneratedValue(strategy = GenerationType.UUID)
+	@Column(columnDefinition = "uuid", updatable = false, nullable = false)
+	private UUID id;
 
-    @Setter
-    @Column(nullable = false)
-    private String name;
+	@Setter
+	@Column(nullable = false)
+	private String name;
 
-    @Setter
-    @Column(nullable = false)
-    @Builder.Default
-    private String plan = "solo";
+	@Setter
+	@Column(nullable = false)
+	@Builder.Default
+	private String plan = "solo";
 
-    @Column(name = "created_by", nullable = false, columnDefinition = "uuid", updatable = false)
-    private UUID createdBy;
+	@Column(name = "created_by", nullable = false, columnDefinition = "uuid", updatable = false)
+	private UUID createdBy;
 
-    @Column(name = "created_at", nullable = false, updatable = false)
-    @Builder.Default
-    private Instant createdAt = Instant.now();
+	@Column(name = "created_at", nullable = false, updatable = false)
+	@Builder.Default
+	private Instant createdAt = Instant.now();
 
-    @Setter
-    @Column(name = "updated_at", nullable = false)
-    @Builder.Default
-    private Instant updatedAt = Instant.now();
+	@Setter
+	@Column(name = "updated_at", nullable = false)
+	@Builder.Default
+	private Instant updatedAt = Instant.now();
 
-    @Setter
-    @Column(name = "deleted_at")
-    private Instant deletedAt;
+	@Setter
+	@Column(name = "deleted_at")
+	private Instant deletedAt;
 }

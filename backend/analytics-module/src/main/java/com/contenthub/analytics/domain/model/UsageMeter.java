@@ -18,8 +18,7 @@ import java.time.LocalDate;
 import java.util.UUID;
 
 @Entity
-@Table(name = "usage_meter",
-        uniqueConstraints = @UniqueConstraint(columnNames = {"workspace_id", "metric", "period"}))
+@Table(name = "usage_meter", uniqueConstraints = @UniqueConstraint(columnNames = {"workspace_id", "metric", "period"}))
 @Getter
 @Setter
 @NoArgsConstructor
@@ -27,21 +26,21 @@ import java.util.UUID;
 @Builder
 public class UsageMeter {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    @Column(columnDefinition = "uuid", updatable = false, nullable = false)
-    private UUID id;
+	@Id
+	@GeneratedValue(strategy = GenerationType.UUID)
+	@Column(columnDefinition = "uuid", updatable = false, nullable = false)
+	private UUID id;
 
-    @Column(name = "workspace_id", nullable = false, columnDefinition = "uuid")
-    private UUID workspaceId;
+	@Column(name = "workspace_id", nullable = false, columnDefinition = "uuid")
+	private UUID workspaceId;
 
-    @Column(nullable = false)
-    private String metric;
+	@Column(nullable = false)
+	private String metric;
 
-    @Column(nullable = false)
-    private LocalDate period;
+	@Column(nullable = false)
+	private LocalDate period;
 
-    @Column(nullable = false, precision = 19, scale = 6)
-    @Builder.Default
-    private BigDecimal quantity = BigDecimal.ZERO;
+	@Column(nullable = false, precision = 19, scale = 6)
+	@Builder.Default
+	private BigDecimal quantity = BigDecimal.ZERO;
 }

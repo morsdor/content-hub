@@ -18,19 +18,15 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class WorkspaceController {
 
-    private final CreateWorkspaceUseCase createWorkspaceUseCase;
+	private final CreateWorkspaceUseCase createWorkspaceUseCase;
 
-    @PostMapping
-    @ResponseStatus(HttpStatus.CREATED)
-    public CreateWorkspaceResponse create(
-            @Valid @RequestBody CreateWorkspaceRequest request,
-            Principal principal) {
-        // sub claim from the JWT — mock-oauth2 issues UUID subs in local dev
-        UUID createdBy = UUID.fromString(principal.getName());
-        var id = createWorkspaceUseCase.createWorkspace(
-                request.name(),
-                request.plan() != null ? request.plan() : "solo",
-                createdBy);
-        return new CreateWorkspaceResponse(id);
-    }
+	@PostMapping
+	@ResponseStatus(HttpStatus.CREATED)
+	public CreateWorkspaceResponse create(@Valid @RequestBody CreateWorkspaceRequest request, Principal principal) {
+		// sub claim from the JWT — mock-oauth2 issues UUID subs in local dev
+		UUID createdBy = UUID.fromString(principal.getName());
+		var id = createWorkspaceUseCase.createWorkspace(request.name(),
+				request.plan() != null ? request.plan() : "solo", createdBy);
+		return new CreateWorkspaceResponse(id);
+	}
 }

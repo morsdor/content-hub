@@ -23,48 +23,48 @@ import java.util.UUID;
 @Builder
 public class MediaAsset {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    @Column(columnDefinition = "uuid", updatable = false, nullable = false)
-    private UUID id;
+	@Id
+	@GeneratedValue(strategy = GenerationType.UUID)
+	@Column(columnDefinition = "uuid", updatable = false, nullable = false)
+	private UUID id;
 
-    @Column(name = "workspace_id", nullable = false, columnDefinition = "uuid", updatable = false)
-    private UUID workspaceId;
+	@Column(name = "workspace_id", nullable = false, columnDefinition = "uuid", updatable = false)
+	private UUID workspaceId;
 
-    @Column(name = "card_id", columnDefinition = "uuid", updatable = false)
-    private UUID cardId;
+	@Column(name = "card_id", columnDefinition = "uuid", updatable = false)
+	private UUID cardId;
 
-    @Column(name = "s3_key", nullable = false, updatable = false)
-    private String s3Key;
+	@Column(name = "s3_key", nullable = false, updatable = false)
+	private String s3Key;
 
-    @Column(name = "s3_bucket", nullable = false, updatable = false)
-    private String s3Bucket;
+	@Column(name = "s3_bucket", nullable = false, updatable = false)
+	private String s3Bucket;
 
-    @Column(name = "content_type", nullable = false, updatable = false)
-    private String contentType;
+	@Column(name = "content_type", nullable = false, updatable = false)
+	private String contentType;
 
-    @Column(name = "size_bytes", nullable = false, updatable = false)
-    private long sizeBytes;
+	@Column(name = "size_bytes", nullable = false, updatable = false)
+	private long sizeBytes;
 
-    @Setter
-    @Column(name = "duration_ms")
-    private Integer durationMs;
+	@Setter
+	@Column(name = "duration_ms")
+	private Integer durationMs;
 
-    @Setter
-    @Column(nullable = false)
-    @Builder.Default
-    private MediaStatus status = MediaStatus.UPLOADING;
+	@Setter
+	@Column(nullable = false)
+	@Builder.Default
+	private MediaStatus status = MediaStatus.UPLOADING;
 
-    @Setter
-    @Column(name = "transcript_id")
-    private String transcriptId;
+	@Setter
+	@Column(name = "transcript_id")
+	private String transcriptId;
 
-    @Column(name = "created_at", nullable = false, updatable = false)
-    @Builder.Default
-    private Instant createdAt = Instant.now();
+	@Column(name = "created_at", nullable = false, updatable = false)
+	@Builder.Default
+	private Instant createdAt = Instant.now();
 
-    @Setter
-    @Column(name = "updated_at", nullable = false)
-    @Builder.Default
-    private Instant updatedAt = Instant.now();
+	@Setter
+	@Column(name = "updated_at", nullable = false)
+	@Builder.Default
+	private Instant updatedAt = Instant.now();
 }

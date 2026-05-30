@@ -6,7 +6,7 @@ import java.util.UUID;
 
 public interface TranscriptPersistencePort {
 
-    Transcript save(Transcript transcript);
+	Transcript save(Transcript transcript);
 
-    boolean existsByMediaAssetId(UUID mediaAssetId);
+	boolean existsByMediaAssetId(UUID mediaAssetId);
 }

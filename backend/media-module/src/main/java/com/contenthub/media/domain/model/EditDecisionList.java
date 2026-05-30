@@ -25,21 +25,21 @@ import java.util.UUID;
 @Builder
 public class EditDecisionList {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    @Column(columnDefinition = "uuid", updatable = false, nullable = false)
-    private UUID id;
+	@Id
+	@GeneratedValue(strategy = GenerationType.UUID)
+	@Column(columnDefinition = "uuid", updatable = false, nullable = false)
+	private UUID id;
 
-    @Column(name = "card_id", nullable = false, columnDefinition = "uuid")
-    private UUID cardId;
+	@Column(name = "card_id", nullable = false, columnDefinition = "uuid")
+	private UUID cardId;
 
-    @Column(name = "workspace_id", nullable = false, columnDefinition = "uuid")
-    private UUID workspaceId;
+	@Column(name = "workspace_id", nullable = false, columnDefinition = "uuid")
+	private UUID workspaceId;
 
-    @Version
-    private long version;
+	@Version
+	private long version;
 
-    @Column(name = "updated_at", nullable = false)
-    @Builder.Default
-    private Instant updatedAt = Instant.now();
+	@Column(name = "updated_at", nullable = false)
+	@Builder.Default
+	private Instant updatedAt = Instant.now();
 }

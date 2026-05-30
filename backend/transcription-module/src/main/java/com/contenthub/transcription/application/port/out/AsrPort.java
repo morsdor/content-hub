@@ -6,5 +6,5 @@ import java.util.List;
 
 public interface AsrPort {
 
-    List<TranscriptSegment> transcribe(String s3Bucket, String s3Key);
+	List<TranscriptSegment> transcribe(String s3Bucket, String s3Key);
 }

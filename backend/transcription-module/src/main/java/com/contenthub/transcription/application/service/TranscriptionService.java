@@ -19,29 +19,23 @@ import java.util.UUID;
 @Slf4j
 public class TranscriptionService implements TranscribeMediaUseCase {
 
-    private final AsrPort asrPort;
-    private final TranscriptPersistencePort transcriptPersistencePort;
+	private final AsrPort asrPort;
+	private final TranscriptPersistencePort transcriptPersistencePort;
 
-    @Override
-    public void transcribe(UUID mediaId, UUID workspaceId, String s3Key, String s3Bucket, String traceId) {
-        log.info("Starting transcription for mediaId={} traceId={}", mediaId, traceId);
-        List<TranscriptSegment> segments = asrPort.transcribe(s3Bucket, s3Key);
+	@Override
+	public void transcribe(UUID mediaId, UUID workspaceId, String s3Key, String s3Bucket, String traceId) {
+		log.info("Starting transcription for mediaId={} traceId={}", mediaId, traceId);
+		List<TranscriptSegment> segments = asrPort.transcribe(s3Bucket, s3Key);
 
-        Transcript transcript = Transcript.builder()
-                .mediaAssetId(mediaId)
-                .workspaceId(workspaceId)
-                .provider("mock")
-                .language("en")
-                .status(TranscriptStatus.COMPLETED)
-                .segments(segments)
-                .build();
+		Transcript transcript = Transcript.builder().mediaAssetId(mediaId).workspaceId(workspaceId).provider("mock")
+				.language("en").status(TranscriptStatus.COMPLETED).segments(segments).build();
 
-        try {
-            transcriptPersistencePort.save(transcript);
-            log.info("Transcription completed for mediaId={}", mediaId);
-        } catch (DuplicateKeyException e) {
-            // unique index on mediaAssetId — duplicate delivery, safe to ignore
-            log.info("Transcript already exists for mediaId={}, skipping (idempotent)", mediaId);
-        }
-    }
+		try {
+			transcriptPersistencePort.save(transcript);
+			log.info("Transcription completed for mediaId={}", mediaId);
+		} catch (DuplicateKeyException e) {
+			// unique index on mediaAssetId — duplicate delivery, safe to ignore
+			log.info("Transcript already exists for mediaId={}, skipping (idempotent)", mediaId);
+		}
+	}
 }
