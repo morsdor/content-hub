@@ -24,21 +24,21 @@ import java.util.UUID;
 @Builder
 public class BoardColumn {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    @Column(columnDefinition = "uuid", updatable = false, nullable = false)
-    private UUID id;
+	@Id
+	@GeneratedValue(strategy = GenerationType.UUID)
+	@Column(columnDefinition = "uuid", updatable = false, nullable = false)
+	private UUID id;
 
-    @Column(name = "workspace_id", nullable = false, columnDefinition = "uuid")
-    private UUID workspaceId;
+	@Column(name = "workspace_id", nullable = false, columnDefinition = "uuid")
+	private UUID workspaceId;
 
-    @Column(nullable = false)
-    private String name;
+	@Column(nullable = false)
+	private String name;
 
-    @Column(nullable = false)
-    private int position;
+	@Column(nullable = false)
+	private int position;
 
-    @Column(name = "created_at", nullable = false, updatable = false)
-    @Builder.Default
-    private Instant createdAt = Instant.now();
+	@Column(name = "created_at", nullable = false, updatable = false)
+	@Builder.Default
+	private Instant createdAt = Instant.now();
 }

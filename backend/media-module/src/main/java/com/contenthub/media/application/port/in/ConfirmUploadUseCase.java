@@ -4,5 +4,5 @@ import java.util.UUID;
 
 public interface ConfirmUploadUseCase {
 
-    void confirmUpload(UUID mediaId, UUID callerUserId, String traceId);
+	void confirmUpload(UUID mediaId, UUID callerUserId, String traceId);
 }

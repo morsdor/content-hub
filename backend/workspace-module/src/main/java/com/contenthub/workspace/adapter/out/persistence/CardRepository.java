@@ -8,5 +8,5 @@ import java.util.UUID;
 
 public interface CardRepository extends JpaRepository<Card, UUID> {
 
-    List<Card> findByWorkspaceIdAndColumnIdAndDeletedAtIsNullOrderByPosition(UUID workspaceId, UUID columnId);
+	List<Card> findByWorkspaceIdAndColumnIdAndDeletedAtIsNullOrderByPosition(UUID workspaceId, UUID columnId);
 }

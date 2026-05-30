@@ -4,5 +4,5 @@ import java.util.UUID;
 
 public interface CreateWorkspaceUseCase {
 
-    UUID createWorkspace(String name, String plan, UUID createdBy);
+	UUID createWorkspace(String name, String plan, UUID createdBy);
 }

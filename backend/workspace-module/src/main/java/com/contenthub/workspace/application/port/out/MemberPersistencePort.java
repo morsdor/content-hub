@@ -4,5 +4,5 @@ import com.contenthub.workspace.domain.model.WorkspaceMember;
 
 public interface MemberPersistencePort {
 
-    WorkspaceMember save(WorkspaceMember member);
+	WorkspaceMember save(WorkspaceMember member);
 }

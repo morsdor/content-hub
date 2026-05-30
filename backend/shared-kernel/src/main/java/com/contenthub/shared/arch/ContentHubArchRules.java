@@ -11,18 +11,17 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
  */
 public final class ContentHubArchRules {
 
-    private ContentHubArchRules() {}
+	private ContentHubArchRules() {
+	}
 
-    public static ArchRule persistenceAdaptersArePrivateTo(String module, String... otherModules) {
-        String[] forbiddenCallers = new String[otherModules.length];
-        for (int i = 0; i < otherModules.length; i++) {
-            forbiddenCallers[i] = "com.contenthub." + otherModules[i] + "..";
-        }
-        return noClasses()
-                .that().resideInAnyPackage(forbiddenCallers)
-                .should().accessClassesThat()
-                .resideInAPackage("com.contenthub." + module + ".adapter.out.persistence..")
-                .because("Module '" + module + "' owns its persistence layer (ADR-0009). " +
-                         "Cross-module access must go through published application ports or events.");
-    }
+	public static ArchRule persistenceAdaptersArePrivateTo(String module, String... otherModules) {
+		String[] forbiddenCallers = new String[otherModules.length];
+		for (int i = 0; i < otherModules.length; i++) {
+			forbiddenCallers[i] = "com.contenthub." + otherModules[i] + "..";
+		}
+		return noClasses().that().resideInAnyPackage(forbiddenCallers).should().accessClassesThat()
+				.resideInAPackage("com.contenthub." + module + ".adapter.out.persistence..")
+				.because("Module '" + module + "' owns its persistence layer (ADR-0009). "
+						+ "Cross-module access must go through published application ports or events.");
+	}
 }

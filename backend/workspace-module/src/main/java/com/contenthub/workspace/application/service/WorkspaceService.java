@@ -16,24 +16,18 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class WorkspaceService implements CreateWorkspaceUseCase {
 
-    private final WorkspacePersistencePort workspacePersistencePort;
-    private final MemberPersistencePort memberPersistencePort;
+	private final WorkspacePersistencePort workspacePersistencePort;
+	private final MemberPersistencePort memberPersistencePort;
 
-    @Override
-    @Transactional
-    public UUID createWorkspace(String name, String plan, UUID createdBy) {
-        Workspace workspace = Workspace.builder()
-                .name(name)
-                .plan(plan)
-                .createdBy(createdBy)
-                .build();
-        Workspace saved = workspacePersistencePort.save(workspace);
+	@Override
+	@Transactional
+	public UUID createWorkspace(String name, String plan, UUID createdBy) {
+		Workspace workspace = Workspace.builder().name(name).plan(plan).createdBy(createdBy).build();
+		Workspace saved = workspacePersistencePort.save(workspace);
 
-        memberPersistencePort.save(WorkspaceMember.builder()
-                .id(new WorkspaceMemberId(saved.getId(), createdBy))
-                .role("owner")
-                .build());
+		memberPersistencePort.save(
+				WorkspaceMember.builder().id(new WorkspaceMemberId(saved.getId(), createdBy)).role("owner").build());
 
-        return saved.getId();
-    }
+		return saved.getId();
+	}
 }

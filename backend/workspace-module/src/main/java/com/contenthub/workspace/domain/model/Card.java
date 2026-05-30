@@ -28,39 +28,39 @@ import java.util.UUID;
 @Builder
 public class Card {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    @Column(columnDefinition = "uuid", updatable = false, nullable = false)
-    private UUID id;
+	@Id
+	@GeneratedValue(strategy = GenerationType.UUID)
+	@Column(columnDefinition = "uuid", updatable = false, nullable = false)
+	private UUID id;
 
-    @Column(name = "workspace_id", nullable = false, columnDefinition = "uuid")
-    private UUID workspaceId;
+	@Column(name = "workspace_id", nullable = false, columnDefinition = "uuid")
+	private UUID workspaceId;
 
-    @Column(name = "column_id", nullable = false, columnDefinition = "uuid")
-    private UUID columnId;
+	@Column(name = "column_id", nullable = false, columnDefinition = "uuid")
+	private UUID columnId;
 
-    @Column(nullable = false)
-    private String title;
+	@Column(nullable = false)
+	private String title;
 
-    @Column(nullable = false, precision = 19, scale = 9)
-    private BigDecimal position;
+	@Column(nullable = false, precision = 19, scale = 9)
+	private BigDecimal position;
 
-    @JdbcTypeCode(SqlTypes.ARRAY)
-    @Column(name = "target_platforms", columnDefinition = "text[]", nullable = false)
-    @Builder.Default
-    private String[] targetPlatforms = new String[0];
+	@JdbcTypeCode(SqlTypes.ARRAY)
+	@Column(name = "target_platforms", columnDefinition = "text[]", nullable = false)
+	@Builder.Default
+	private String[] targetPlatforms = new String[0];
 
-    @Column(name = "due_date")
-    private LocalDate dueDate;
+	@Column(name = "due_date")
+	private LocalDate dueDate;
 
-    @Column(name = "created_at", nullable = false, updatable = false)
-    @Builder.Default
-    private Instant createdAt = Instant.now();
+	@Column(name = "created_at", nullable = false, updatable = false)
+	@Builder.Default
+	private Instant createdAt = Instant.now();
 
-    @Column(name = "updated_at", nullable = false)
-    @Builder.Default
-    private Instant updatedAt = Instant.now();
+	@Column(name = "updated_at", nullable = false)
+	@Builder.Default
+	private Instant updatedAt = Instant.now();
 
-    @Column(name = "deleted_at")
-    private Instant deletedAt;
+	@Column(name = "deleted_at")
+	private Instant deletedAt;
 }

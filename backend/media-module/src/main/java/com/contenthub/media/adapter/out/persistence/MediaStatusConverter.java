@@ -7,13 +7,13 @@ import jakarta.persistence.Converter;
 @Converter(autoApply = true)
 public class MediaStatusConverter implements AttributeConverter<MediaStatus, String> {
 
-    @Override
-    public String convertToDatabaseColumn(MediaStatus status) {
-        return status == null ? null : status.name().toLowerCase();
-    }
+	@Override
+	public String convertToDatabaseColumn(MediaStatus status) {
+		return status == null ? null : status.name().toLowerCase();
+	}
 
-    @Override
-    public MediaStatus convertToEntityAttribute(String dbValue) {
-        return dbValue == null ? null : MediaStatus.valueOf(dbValue.toUpperCase());
-    }
+	@Override
+	public MediaStatus convertToEntityAttribute(String dbValue) {
+		return dbValue == null ? null : MediaStatus.valueOf(dbValue.toUpperCase());
+	}
 }

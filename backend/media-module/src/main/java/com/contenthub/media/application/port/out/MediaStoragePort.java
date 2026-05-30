@@ -4,7 +4,7 @@ import java.net.URL;
 
 public interface MediaStoragePort {
 
-    URL generatePresignedPutUrl(String bucket, String key, String contentType, long sizeBytes);
+	URL generatePresignedPutUrl(String bucket, String key, String contentType, long sizeBytes);
 
-    String resolveMediaBucket();
+	String resolveMediaBucket();
 }

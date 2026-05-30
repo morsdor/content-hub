@@ -9,7 +9,7 @@ import java.util.UUID;
 
 public interface TranscriptRepository extends MongoRepository<Transcript, String>, TranscriptPersistencePort {
 
-    Optional<Transcript> findByMediaAssetId(UUID mediaAssetId);
+	Optional<Transcript> findByMediaAssetId(UUID mediaAssetId);
 
-    boolean existsByMediaAssetId(UUID mediaAssetId);
+	boolean existsByMediaAssetId(UUID mediaAssetId);
 }

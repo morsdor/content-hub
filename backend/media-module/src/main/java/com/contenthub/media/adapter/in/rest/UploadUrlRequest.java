@@ -6,10 +6,6 @@ import jakarta.validation.constraints.Positive;
 
 import java.util.UUID;
 
-public record UploadUrlRequest(
-        @NotNull UUID workspaceId,
-        UUID cardId,
-        @NotBlank String filename,
-        @NotBlank String contentType,
-        @Positive long sizeBytes
-) {}
+public record UploadUrlRequest(@NotNull UUID workspaceId, UUID cardId, @NotBlank String filename,
+		@NotBlank String contentType, @Positive long sizeBytes) {
+}

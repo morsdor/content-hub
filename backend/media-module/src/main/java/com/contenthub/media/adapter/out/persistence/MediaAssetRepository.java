@@ -10,7 +10,7 @@ import java.util.UUID;
 
 public interface MediaAssetRepository extends JpaRepository<MediaAsset, UUID>, MediaPersistencePort {
 
-    List<MediaAsset> findByWorkspaceIdAndStatus(UUID workspaceId, MediaStatus status);
+	List<MediaAsset> findByWorkspaceIdAndStatus(UUID workspaceId, MediaStatus status);
 
-    java.util.Optional<MediaAsset> findByIdAndWorkspaceId(UUID id, UUID workspaceId);
+	java.util.Optional<MediaAsset> findByIdAndWorkspaceId(UUID id, UUID workspaceId);
 }

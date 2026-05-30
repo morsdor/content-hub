@@ -14,8 +14,8 @@ import java.util.UUID;
 @Slf4j
 public class AnalyticsController {
 
-    @GetMapping("/workspaces/{workspaceId}/metrics")
-    public Map<String, Object> getMetrics(@PathVariable UUID workspaceId) {
-        return Map.of("workspaceId", workspaceId, "metrics", Map.of());
-    }
+	@GetMapping("/workspaces/{workspaceId}/metrics")
+	public Map<String, Object> getMetrics(@PathVariable UUID workspaceId) {
+		return Map.of("workspaceId", workspaceId, "metrics", Map.of());
+	}
 }

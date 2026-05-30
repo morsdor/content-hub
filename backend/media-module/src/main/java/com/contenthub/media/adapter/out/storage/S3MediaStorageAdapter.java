@@ -16,30 +16,25 @@ import java.time.Duration;
 @RequiredArgsConstructor
 public class S3MediaStorageAdapter implements MediaStoragePort {
 
-    private final S3Presigner s3Presigner;
+	private final S3Presigner s3Presigner;
 
-    @Value("${contenthub.s3.media-bucket:contenthub-media-local}")
-    private String mediaBucket;
+	@Value("${contenthub.s3.media-bucket:contenthub-media-local}")
+	private String mediaBucket;
 
-    @Override
-    public URL generatePresignedPutUrl(String bucket, String key, String contentType, long sizeBytes) {
-        PutObjectRequest objectRequest = PutObjectRequest.builder()
-                .bucket(bucket)
-                .key(key)
-                .contentType(contentType)
-                .build();
+	@Override
+	public URL generatePresignedPutUrl(String bucket, String key, String contentType, long sizeBytes) {
+		PutObjectRequest objectRequest = PutObjectRequest.builder().bucket(bucket).key(key).contentType(contentType)
+				.build();
 
-        PutObjectPresignRequest presignRequest = PutObjectPresignRequest.builder()
-                .signatureDuration(Duration.ofMinutes(15))
-                .putObjectRequest(objectRequest)
-                .build();
+		PutObjectPresignRequest presignRequest = PutObjectPresignRequest.builder()
+				.signatureDuration(Duration.ofMinutes(15)).putObjectRequest(objectRequest).build();
 
-        PresignedPutObjectRequest presigned = s3Presigner.presignPutObject(presignRequest);
-        return presigned.url();
-    }
+		PresignedPutObjectRequest presigned = s3Presigner.presignPutObject(presignRequest);
+		return presigned.url();
+	}
 
-    @Override
-    public String resolveMediaBucket() {
-        return mediaBucket;
-    }
+	@Override
+	public String resolveMediaBucket() {
+		return mediaBucket;
+	}
 }

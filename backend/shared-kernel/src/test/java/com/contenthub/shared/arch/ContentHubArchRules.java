@@ -4,5 +4,6 @@ package com.contenthub.shared.arch;
 // ModuleBoundaryTest in the app module imports and executes the rules where all
 // module classes are simultaneously on the classpath.
 final class ArchRulesTestHelper {
-    private ArchRulesTestHelper() {}
+	private ArchRulesTestHelper() {
+	}
 }
