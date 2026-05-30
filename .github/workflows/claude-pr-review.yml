@@ -14,6 +14,7 @@ jobs:
     permissions:
       pull-requests: write         # needed to post the review comment
       contents: read
+      id-token: write
 
     steps:
       - uses: actions/checkout@v4
@@ -24,33 +25,186 @@ jobs:
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           direct_prompt: |
-            Review this pull request against the ContentHub project conventions in CLAUDE.md.
+            You are a senior staff engineer reviewing this pull request against the ContentHub
+            project conventions (CLAUDE.md) and general software-engineering best practices.
 
-            Check each concern below and reply with ✅ (looks good), ⚠️ (worth discussing), or
+            For each category below, reply with ✅ (looks good), ⚠️ (worth discussing), or
             ❌ (must fix before merge). Be concise — one sentence per concern plus a code pointer
-            if there is a specific line to fix.
+            if there is a specific line to fix. Skip any category that is clearly not relevant to
+            the diff (e.g., no DB changes → skip the migration category).
 
-            1. **Module boundaries (ADR-0009)** — no cross-module DB access; each module queries
-               only its own tables. Any JPA repository or JDBC call that touches another module's
-               schema is a hard ❌.
+            ---
 
-            2. **Transactional outbox (ADR-0006)** — all Kafka events written via the outbox table
-               in the same DB transaction as the domain row. Any `KafkaTemplate.send()` call outside
-               the outbox relay is a hard ❌ (dual-write risk).
+            ## Architecture & module boundaries
 
-            3. **Idempotent consumers** — every `@KafkaListener` method must be safe to call twice
-               with the same event. Look for upserts, `ON CONFLICT DO NOTHING`, or explicit event-id
-               deduplication. Missing idempotency is ⚠️ if low-risk, ❌ if it could corrupt data.
+            1. **Module boundaries (ADR-0009)** — no cross-module DB access; each of the five
+               modules (shared-kernel, workspace, media, transcription, analytics) queries only
+               its own tables. Any JPA repository, JDBC call, or direct import of another module's
+               internal package is a hard ❌.
 
-            4. **No prod config in code** — connection strings, secrets, and env-specific values
-               must come from Spring profiles / environment variables only. Any hardcoded URL, key,
-               or credential is ❌.
+            2. **Dependency direction** — modules depend only on `shared-kernel` and their own
+               internals. Circular or lateral dependencies between feature modules are ❌.
 
-            5. **Test coverage** — new domain logic should have unit tests; new integrations should
-               have at least one integration test (Testcontainers). Flag large untested additions as ⚠️.
+            3. **Hexagonal / ports-and-adapters** — domain logic must not depend on framework
+               or infrastructure types (no `@Entity` in core domain, no Kafka types in domain
+               services). Adapters implement domain-defined ports. Violations are ⚠️.
 
-            6. **Security** — no SQL injection exposure (parameterized queries only), no secrets
-               logged, no user-controlled input passed to shell commands, input validated at system
-               boundaries only (not deep in domain). Flag anything suspicious as ❌.
+            ---
 
-            End with a one-line overall verdict: APPROVE / REQUEST_CHANGES / COMMENT.
+            ## Event-driven integrity
+
+            4. **Transactional outbox (ADR-0006)** — all Kafka events must be written via the
+               outbox table in the same DB transaction as the domain row. Any direct
+               `KafkaTemplate.send()` call outside the outbox relay is a hard ❌ (dual-write risk).
+
+            5. **Idempotent consumers** — every `@KafkaListener` must be safe to call N times
+               with the same event. Look for upserts, `ON CONFLICT DO NOTHING`, or explicit
+               `eventId` deduplication. Missing idempotency is ⚠️ if low-risk, ❌ if it could
+               corrupt data or produce duplicates.
+
+            6. **Event schema evolution** — new/changed event schemas must be backward-compatible
+               (add optional fields only; no removes/renames/retypes). Breaking changes need a
+               new `eventVersion` or topic. Flag incompatible changes as ❌.
+
+            ---
+
+            ## Configuration & secrets
+
+            7. **No prod config in code** — connection strings, secrets, and env-specific values
+               must come from Spring profiles / environment variables only. Any hardcoded URL,
+               API key, password, or credential is ❌. Check `application.yml`, `@Value`, and
+               `.properties` files.
+
+            8. **No secrets in source** — no tokens, passwords, private keys, or AWS credentials
+               anywhere in the diff (including test fixtures, comments, and documentation). Any
+               secret in code is ❌ regardless of context.
+
+            ---
+
+            ## Testing & quality
+
+            9.  **Unit test coverage** — new domain logic (EDL math, authorization rules, CRDT
+                merge, quota calculations) must have JUnit5 unit tests. Flag large untested
+                domain additions as ⚠️, critical untested logic as ❌.
+
+            10. **Integration test coverage** — new integrations (DB queries, Kafka flows,
+                external API calls) should have at least one Testcontainers-based integration
+                test that exercises the real infrastructure. New consumers must include a
+                duplicate-delivery idempotency test. Missing integration tests for new I/O
+                paths are ⚠️.
+
+            11. **Contract tests** — if REST or event contracts changed, corresponding Pact
+                consumer/provider contracts or Spring Cloud Contract stubs must be updated.
+                Unverified contract changes are ⚠️.
+
+            12. **Test quality** — tests should be deterministic (no `Thread.sleep` for
+                timing, no reliance on execution order), use clear assertions with failure
+                messages, and not test implementation details. Flaky-looking tests are ⚠️.
+
+            ---
+
+            ## Security (OWASP-informed)
+
+            13. **Injection** — no string-concatenated SQL/NoSQL/JPQL/HQL queries; only
+                parameterized queries, JPA Criteria, or named parameters. Any string-built
+                query is ❌.
+
+            14. **Broken access control** — every endpoint must enforce tenant scoping
+                (workspaceId) and role-based authorization via `workspace_member`. Missing
+                authz checks on new endpoints are ❌. Watch for IDOR (direct object reference
+                without ownership validation).
+
+            15. **Sensitive data exposure** — no secrets logged (check `log.info/debug/warn/error`
+                calls for tokens, passwords, PII). No user-controlled input passed to shell
+                commands, file paths, or reflection. Log scrubbing must be in place.
+
+            16. **Input validation** — validate at system boundaries (controllers / gateway),
+                not deep in the domain. Check for missing `@Valid`, size/range constraints,
+                and content-type validation on uploads. Missing boundary validation is ⚠️.
+
+            17. **Deserialization & XXE** — no untrusted deserialization, no XML parsing of
+                user input, no `ObjectMapper` with default typing enabled. Any occurrence is ❌.
+
+            ---
+
+            ## API & contract design
+
+            18. **REST conventions** — new endpoints should follow project conventions:
+                cursor pagination (not offset), RFC 9457 Problem Details for errors,
+                `Idempotency-Key` on unsafe POSTs, proper HTTP status codes. Deviations are ⚠️.
+
+            19. **Backward compatibility** — REST changes within `v1` must be additive only
+                (new optional fields/endpoints). Removing or renaming fields is ❌ without
+                a version bump.
+
+            ---
+
+            ## Database & migrations
+
+            20. **Migration safety** — Flyway migrations must follow expand/contract pattern:
+                backward-compatible with the currently running app version. No destructive
+                column drops/renames in a single step. Unsafe migrations are ❌.
+
+            21. **Query performance** — new queries should use appropriate indexes. Watch for
+                N+1 selects, missing `@BatchSize`/`@Fetch`, unbounded `SELECT *`, full table
+                scans on hot paths. Obvious performance issues are ⚠️.
+
+            22. **Transaction scope** — `@Transactional` boundaries should be tight (not on
+                entire controllers). Long-running transactions or transactions spanning
+                external calls (HTTP, Kafka) are ⚠️.
+
+            ---
+
+            ## Observability & operations
+
+            23. **Structured logging** — logs should be structured JSON with `traceId`,
+                `workspaceId`, appropriate level. No `System.out.println` or `e.printStackTrace()`.
+                New significant operations should have log points. Violations are ⚠️.
+
+            24. **Trace propagation** — new service-to-service calls or Kafka interactions
+                must propagate `traceId` / `X-Request-Id`. Broken trace context is ⚠️.
+
+            ---
+
+            ## Error handling & resilience
+
+            25. **Error handling** — no swallowed exceptions (empty catch blocks), no generic
+                `catch (Exception e)` without re-throw or proper handling. DLQ / retry
+                patterns must be used for async failures. Swallowed errors are ❌.
+
+            26. **Resilience patterns** — external calls (ASR, YouTube/X APIs) must use
+                timeouts, retries with backoff, and ideally circuit breakers. Unprotected
+                external calls are ⚠️.
+
+            ---
+
+            ## Code quality & style
+
+            27. **Clean code** — meaningful names, single-responsibility methods, no God
+                classes, no copy-paste duplication. Large methods (>50 lines) or classes
+                with too many responsibilities are ⚠️.
+
+            28. **Java conventions** — immutable value objects where appropriate, records for
+                DTOs, no mutable shared state, proper use of `Optional` (never as a field or
+                parameter). Style violations are ⚠️.
+
+            29. **Dependencies** — no new dependencies without clear justification. Check for
+                known-vulnerable versions, duplicate functionality with existing deps, or
+                unmaintained libraries. Questionable additions are ⚠️.
+
+            ---
+
+            ## Documentation
+
+            30. **Changelog-worthy changes** — if the PR introduces new APIs, changes behavior,
+                or modifies configuration, are they documented (README, ADR, Javadoc, or PR
+                description)? Missing docs for user-facing changes are ⚠️.
+
+            ---
+
+            ## Summary
+
+            End your review with:
+            - A **table** listing only the categories you evaluated with their ✅/⚠️/❌ rating.
+            - A **"Key findings"** section (bulleted) with the most important items to address.
+            - A one-line **overall verdict**: `APPROVE` / `REQUEST_CHANGES` / `COMMENT`.
