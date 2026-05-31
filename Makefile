@@ -8,7 +8,8 @@
 #   make dev-down  ← stop (volumes preserved)
 
 .PHONY: help doctor dev-up dev-down dev-restart logs status migrate seed clean clean-force \
-        backend-build backend-test backend-run
+        backend-build backend-test backend-run \
+        frontend-install frontend-dev frontend-build
 
 COMPOSE     := docker compose
 ENV_FILE    := .env.local
@@ -38,6 +39,11 @@ help:
 	@echo "  make seed           Load demo fixtures (workspace, user, sample media)"
 	@echo "  make clean          Stop containers, print data-wipe reminder"
 	@echo "  make clean-force    Stop + DELETE all volumes  [destructive]"
+	@echo ""
+	@echo "Frontend:"
+	@echo "  make frontend-install   npm install in frontend/"
+	@echo "  make frontend-dev       npm run dev  (HMR on :5173, proxy /api → :8080)"
+	@echo "  make frontend-build     npm run build (dist/ with type-check)"
 	@echo ""
 
 # ── Prerequisites ─────────────────────────────────────────────────────────────
@@ -105,6 +111,17 @@ backend-run:
 	$(MAVEN) -f backend/pom.xml -pl app spring-boot:run \
 	  -Dspring-boot.run.profiles=dev \
 	  -Dspring-boot.run.jvmArguments="-Dspring.profiles.active=dev"
+
+# ── Frontend build ───────────────────────────────────────────────────────────
+
+frontend-install:
+	cd frontend && npm install
+
+frontend-dev:
+	cd frontend && npm run dev
+
+frontend-build:
+	cd frontend && npm run build
 
 # ── App lifecycle ─────────────────────────────────────────────────────────────
 
