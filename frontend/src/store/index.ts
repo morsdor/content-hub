@@ -9,8 +9,7 @@ export const store = configureStore({
     workspace: workspaceReducer,
     [contentHubApi.reducerPath]: contentHubApi.reducer,
   },
-  middleware: (getDefaultMiddleware) =>
-    getDefaultMiddleware().concat(contentHubApi.middleware),
+  middleware: (getDefaultMiddleware) => getDefaultMiddleware().concat(contentHubApi.middleware),
 });
 
 export type RootState = ReturnType<typeof store.getState>;

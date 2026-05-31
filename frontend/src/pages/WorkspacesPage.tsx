@@ -16,11 +16,24 @@ export function WorkspacesPage() {
 
   return (
     <div style={{ maxWidth: '640px', margin: '0 auto', padding: '2rem' }}>
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+      <header
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: '2rem',
+        }}
+      >
         <Heading size="xlarge">ContentHub</Heading>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          {user && <span style={{ color: 'var(--ds-text-subtle)', fontSize: '0.875rem' }}>{user.email}</span>}
-          <Button appearance="subtle" onClick={handleLogout}>Sign out</Button>
+          {user && (
+            <span style={{ color: 'var(--ds-text-subtle)', fontSize: '0.875rem' }}>
+              {user.email}
+            </span>
+          )}
+          <Button appearance="subtle" onClick={handleLogout}>
+            Sign out
+          </Button>
         </div>
       </header>
 

@@ -33,7 +33,9 @@ export function WorkspaceCreate() {
                       </Button>
                     </div>
                   </div>
-                  {error && <ErrorMessage>Failed to create workspace. Please try again.</ErrorMessage>}
+                  {error && (
+                    <ErrorMessage>Failed to create workspace. Please try again.</ErrorMessage>
+                  )}
                 </>
               )}
             </Field>

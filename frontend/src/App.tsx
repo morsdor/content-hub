@@ -10,14 +10,8 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/auth/callback" element={<AuthCallback />} />
-      <Route
-        path="/workspaces"
-        element={<WorkspacesPage />}
-      />
-      <Route
-        path="/workspaces/:id"
-        element={<WorkspaceDetailPage />}
-      />
+      <Route path="/workspaces" element={<WorkspacesPage />} />
+      <Route path="/workspaces/:id" element={<WorkspaceDetailPage />} />
       <Route path="/" element={<Navigate to="/workspaces" replace />} />
     </Routes>
   );

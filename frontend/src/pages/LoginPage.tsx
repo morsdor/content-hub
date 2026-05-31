@@ -21,7 +21,15 @@ export function LoginPage() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: '6rem', gap: '1rem' }}>
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        paddingTop: '6rem',
+        gap: '1rem',
+      }}
+    >
       <Heading size="xlarge">ContentHub</Heading>
       <p style={{ color: 'var(--ds-text-subtle)', margin: 0 }}>
         Browser-based Descript-style content production platform.
