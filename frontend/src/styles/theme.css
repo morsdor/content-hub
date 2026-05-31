@@ -1,0 +1,73 @@
+/* ContentHub — Atlaskit theme overrides (docs/DESIGN.md §9.3) */
+
+/* ── Light mode ─────────────────────────────────────────────────────────── */
+[data-theme~="light"] {
+  /* Brand: Studio Green (CTA only) */
+  --ds-background-brand-bold:          #1ED760;
+  --ds-background-brand-bold-hovered:  #17A84A;
+  --ds-background-brand-bold-pressed:  #0F7A35;
+  --ds-text-inverse:                   #000000; /* ON green-500 — 11.3:1 AAA */
+  --ds-text-brand:                     #0F7A35; /* green text on white — 7.3:1 AAA */
+  --ds-icon-brand:                     #17A84A;
+
+  /* ContentHub Blue */
+  --ds-link:                           #1860E8;
+  --ds-link-pressed:                   #1350C5;
+  --ds-border-focused:                 #1860E8;
+
+  /* Surfaces */
+  --ds-surface:                        #FFFFFF;
+  --ds-surface-overlay:                #FFFFFF;
+  --ds-surface-raised:                 #FFFFFF;
+  --ds-surface-sunken:                 #F6F8FA;
+
+  /* Text */
+  --ds-text:                           #0D1117;
+  --ds-text-subtle:                    #484F58;
+  --ds-text-subtlest:                  #6E7681;
+  --ds-text-disabled:                  #8B949E;
+
+  /* Borders */
+  --ds-border:                         #C9D1D9;
+  --ds-border-input:                   #C9D1D9;
+}
+
+/* ── Dark mode ──────────────────────────────────────────────────────────── */
+[data-theme~="dark"] {
+  --ds-background-brand-bold:          #1ED760;
+  --ds-background-brand-bold-hovered:  #17A84A;
+  --ds-background-brand-bold-pressed:  #0F7A35;
+  --ds-text-inverse:                   #000000;
+  --ds-text-brand:                     #1ED760; /* ON dark — 9.3:1 AAA */
+  --ds-icon-brand:                     #1ED760;
+
+  --ds-link:                           #60A5FA;
+  --ds-link-pressed:                   #93C5FD;
+  --ds-border-focused:                 #60A5FA;
+
+  --ds-surface:                        #161B22;
+  --ds-surface-overlay:                #21262D;
+  --ds-surface-raised:                 #21262D;
+  --ds-surface-sunken:                 #0D1117;
+
+  --ds-text:                           #ECEFF3;
+  --ds-text-subtle:                    #8B949E;
+  --ds-text-subtlest:                  #6E7681;
+  --ds-text-disabled:                  #484F58;
+
+  --ds-border:                         #30363D;
+  --ds-border-input:                   #484F58;
+}
+
+/* ── Base reset ─────────────────────────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background-color: var(--ds-surface-sunken, #F6F8FA);
+  color: var(--ds-text, #0D1117);
+  -webkit-font-smoothing: antialiased;
+}

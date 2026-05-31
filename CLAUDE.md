@@ -9,11 +9,22 @@ performance — all in a browser tab. Full blueprint in `docs/` (14 chapters, 10
 ## Essential commands
 
 ```bash
+# Infrastructure
 make doctor        # check prerequisites (Docker, Java 21, Node 20, Maven)
 make dev-up        # start the full local stack (Postgres, Mongo, Kafka, LocalStack, Jaeger, Grafana)
 make dev-down      # stop containers, keep volumes
 make logs          # tail all container logs  (make logs svc=kafka)
 make clean-force   # wipe all local data volumes
+
+# Backend
+make backend-build  # compile (requires JAVA_HOME → JDK 21)
+make backend-test   # run all tests
+make backend-run    # run Spring Boot with profile=dev
+
+# Frontend
+make frontend-install  # npm install in frontend/
+make frontend-dev      # Vite HMR on :5173 (proxies /api → :8080)
+make frontend-build    # tsc + vite build → dist/
 ```
 
 ---
@@ -32,6 +43,22 @@ is the Spring Boot modular monolith skeleton. See `PROGRESS.md` for exact scope 
 
 React SPA → Spring Cloud Gateway (JWT) → modular-monolith Spring Boot app → Kafka async backbone →
 Postgres (relational) + MongoDB (transcripts/metrics) + S3 (media blobs).
+
+---
+
+## Frontend conventions (non-negotiable)
+
+| Rule | Why |
+|------|-----|
+| **Use Atlaskit components for all UI** — never raw `<button>`, `<input>`, `<h1>`, `<form>` etc. | Design-system consistency; Atlaskit handles a11y and focus management for free |
+| **RTK Query for every API call** — never `createAsyncThunk`, never raw `axios` in components | Single data layer: caching, invalidation, loading/error states managed in one place |
+| **All colors, spacing, radius from `docs/DESIGN.md`** — never hardcode `#hex`, `px`, or `rem` values | Tokens stay in sync with the design spec; dark-mode flips automatically |
+| **WCAG 2.1 AA minimum** — check new colors against the contrast tables in `docs/DESIGN.md §3` | Accessibility is a hard requirement, not a nice-to-have |
+| **Studio Green (`#1ED760`) is CTA-only** — primary buttons, active nav, live indicators, nothing else | Scarcity preserves visual impact; decoration dilutes it |
+| **Black text on green-500 buttons** — white text on `#1ED760` fails WCAG (1.9:1) | Contrast rule; black gives 11.3:1 (AAA) |
+
+> **Design source of truth:** `docs/DESIGN.md` — tokens, colour modes, Atlaskit theme overrides,
+> component quick-reference, and the five usage rules. Read it before touching any UI file.
 
 ---
 
@@ -69,6 +96,7 @@ analytics-module    YouTube/X OAuth, publish scheduling, metrics ingestion
 | What are the DB schemas? | `docs/04-data-model.md` |
 | What are the Kafka topic contracts? | `docs/05-api-and-event-contracts.md` |
 | How does local dev work? | `docs/12-cost-and-local-dev.md` |
+| **Design tokens, colours, Atlaskit theming?** | **`docs/DESIGN.md`** |
 | What's done and what's next? | `PROGRESS.md` |
 
 ---

@@ -48,15 +48,44 @@
 
 ---
 
-## In Progress
+### 2026-05-30 — React + TypeScript SPA skeleton + RTK Query data layer
 
-_Nothing. Spring Boot skeleton complete._
+- `frontend/` Vite 5 + React 18 + TypeScript strict project; `npm run build` → clean `dist/`
+- `react-oidc-context` + `oidc-client-ts` PKCE flow; `CognitoAuthProvider` syncs JWT to Redux on auth state change
+- Redux Toolkit store: `auth/slice` (token + user profile), `workspace/slice` (`currentWorkspaceId` only)
+- **RTK Query** (`src/api/contentHubApi.ts`): `getWorkspaces` query + `createWorkspace` mutation; `prepareHeaders` injects Bearer token from Redux; `invalidatesTags` auto-refetches list after create
+- No axios singleton, no `createAsyncThunk`, no manual loading/error state — RTK Query owns all of that
+- React Router v6: `/login`, `/auth/callback`, `/workspaces`, `/workspaces/:id`; `ProtectedRoute` guard
+- `WorkspaceList` + `WorkspaceCreate` use `useGetWorkspacesQuery` / `useCreateWorkspaceMutation` hooks directly
+- `useWebSocket(workspaceId)` stub, `MediaUpload` and `AnalyticsDashboard` stubs in `features/`
+- Makefile: `frontend-install`, `frontend-dev`, `frontend-build` targets
+- Default dev config (no `.env.local` needed): OIDC → mock-oauth2 `:8090/contenthub`
+
+### 2026-05-31 — Atlaskit integration + design system
+
+- Installed Atlaskit packages: `@atlaskit/tokens`, `button`, `textfield`, `form`, `heading`, `spinner`, `lozenge`, `empty-state`, `page-layout`, `side-navigation`, `flag`
+- `src/styles/theme.css` — CSS variable overrides for light + dark mode (Studio Green CTA, ContentHub Blue)
+- `src/main.tsx` — `setGlobalTheme({ colorMode: 'light' })` bootstrap; Inter loaded via Google Fonts CDN
+- All raw HTML UI elements replaced: `Button`, `Textfield`, `Form`+`Field`, `Heading`, `Spinner`, `EmptyState` used throughout
+- `axios` dependency removed (RTK Query's `fetchBaseQuery` handles HTTP)
+- `npm run build` passes; zero TypeScript errors
+
+### 2026-05-31 — Design system (`docs/DESIGN.md`)
+
+- Full token spec: Studio Green `#1ED760` CTA-only, ContentHub Blue `#1860E8`, neutral scale, semantic colours
+- Light + dark mode tokens; all verified against WCAG 2.1 AA (contrast tables in §3)
+- 6-colour data-viz palette (L=0.133–0.30 window) with separate dark-mode lightened variants
+- Density tiers: Balanced (board/settings) + Compact (timeline editor)
+- Atlaskit integration plan: package list, `setGlobalTheme` bootstrap, `theme.css` CSS variable overrides
+- `CLAUDE.md` updated: Frontend conventions section (Atlaskit-only, RTK Query-only, WCAG, green CTA rule)
+
+---
 
 ---
 
 ## Next
 
-### React + TypeScript SPA skeleton
+### Flyway V2 + Phase 0 walking skeleton
 
 **Scope:** A runnable Vite + React 18 + TypeScript SPA in `frontend/` that mirrors the backend's
 domain structure and proves the auth handshake against mock-oauth2 locally.
@@ -106,16 +135,16 @@ frontend/
 
 ## After Next (backlog, in order)
 
-1. **Flyway V2 + Phase 0 walking skeleton** — auth flow end-to-end: login → JWT validated by Gateway
-   → `POST /api/v1/workspaces` persists to Postgres → `POST /api/v1/media/upload-url` returns
-   presigned S3 URL → browser PUT to LocalStack → `video.uploaded` written to outbox → relay
-   publishes to Kafka → `transcription-module` consumes it (mock ASR) → transcript in MongoDB
 2. **Transcription mock pipeline** — verify the full Kafka event chain end-to-end with integration tests
 3. **Terraform module skeletons** — VPC, EKS/Fargate, RDS, MSK, S3, Cognito (infra/modules/)
 4. **GitHub Actions CI** — implement `ci.yml` (§2: Snyk OSS, SonarCloud, Spring Cloud Contract,
    Pact, Schema Registry plugin, Trivy) and `claude-pr-review.yml` (§2.1, PRs to `develop` only).
    QA deploy workflow (`qa-deploy.yml`) is already written in §2.2 but **PAUSED** — enable it after
    Terraform modules (item 3) are done and OIDC + IAM role are set up in AWS.
+
+> **Note (Phase 0 walking skeleton scope):** the `Flyway V2 + Phase 0` item became the new ##Next above.
+> Its acceptance criteria are the end-to-end spine: login → JWT → workspace creation → S3 upload →
+> `video.uploaded` via outbox → Kafka → mock ASR → transcript in MongoDB.
 
 ---
 
@@ -136,10 +165,19 @@ Start by reading these files in order:
 Then pick up PROGRESS.md §Next and implement it.
 
 Environment notes:
-- Build: JAVA_HOME=/Library/Java/JavaVirtualMachines/jdk-21.jdk/Contents/Home (Homebrew openjdk 25 breaks Lombok)
+- Backend build: JAVA_HOME=/Library/Java/JavaVirtualMachines/jdk-21.jdk/Contents/Home (Homebrew openjdk 25 breaks Lombok)
 - Use `make backend-build`, `make backend-test`, `make backend-run` (Makefile pins JDK 21)
 - MongoDB URI needs ?authSource=admin (root user is in admin database)
 - Testcontainers smoke test (ApplicationSmokeTest) requires Testcontainers ≥1.21 for Docker Desktop 4.75
+- Frontend: `make frontend-install` then `make frontend-dev` (Vite HMR on :5173, proxies /api → :8080)
+- Frontend auth: OIDC via react-oidc-context; no .env.local needed for dev (defaults to mock-oauth2 :8090)
+
+Frontend non-negotiables (also in CLAUDE.md §Frontend conventions):
+- ALL UI must use Atlaskit components — never raw <button>, <input>, <form>, <h1>–<h6>
+- ALL API calls via RTK Query (src/api/contentHubApi.ts) — no createAsyncThunk, no raw axios
+- ALL colors/spacing from docs/DESIGN.md tokens — never hardcode hex or px values
+- Studio Green (#1ED760) is CTA-only; black label text on green-500 (WCAG contrast rule)
+- Read docs/DESIGN.md before touching any UI file
 
 Non-negotiable rules (read CLAUDE.md for the full list):
 - Modular monolith first: one Spring Boot deployable, 5 Maven modules, no cross-module DB access
@@ -156,4 +194,6 @@ Settled decisions (do not re-litigate):
 - CI toolchain: Snyk OSS (SCA), SonarCloud (SAST), Spring Cloud Contract + Pact (contracts),
   Confluent Schema Registry Maven plugin (Kafka compat), Trivy (image scan)
 - ArgoCD runs inside EKS as pods; monorepo deploy path at infra/deploy/envs/{qa,prod}/values.yaml
+- Frontend auth uses oidc-client-ts (standard PKCE) — works with mock-oauth2 locally and Cognito in prod
+- Frontend data layer uses RTK Query (contentHubApi) — no async thunks, no axios client singleton
 ```
