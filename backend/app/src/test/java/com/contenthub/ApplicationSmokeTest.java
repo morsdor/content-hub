@@ -1,6 +1,7 @@
 package com.contenthub;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIf;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
@@ -9,16 +10,19 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.testcontainers.DockerClientFactory;
 import org.testcontainers.containers.MongoDBContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.kafka.KafkaContainer;
+import org.testcontainers.utility.DockerImageName;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Testcontainers
+@EnabledIf("dockerAvailable")
 @ActiveProfiles("test")
 class ApplicationSmokeTest {
 
@@ -31,7 +35,10 @@ class ApplicationSmokeTest {
 	static MongoDBContainer mongo = new MongoDBContainer("mongo:7.0");
 
 	@Container
-	static KafkaContainer kafka = new KafkaContainer("confluentinc/cp-kafka:7.6.1");
+	static KafkaContainer kafka = new KafkaContainer(
+			DockerImageName.parse("confluentinc/cp-kafka:7.6.1")
+				.asCompatibleSubstituteFor("apache/kafka")
+		);
 
 	@DynamicPropertySource
 	static void configureProperties(DynamicPropertyRegistry registry) {
@@ -40,6 +47,14 @@ class ApplicationSmokeTest {
 		registry.add("spring.datasource.password", postgres::getPassword);
 		registry.add("spring.data.mongodb.uri", mongo::getReplicaSetUrl);
 		registry.add("spring.kafka.bootstrap-servers", kafka::getBootstrapServers);
+	}
+
+	static boolean dockerAvailable() {
+		try {
+			return DockerClientFactory.instance().isDockerAvailable();
+		} catch (Throwable ignored) {
+			return false;
+		}
 	}
 
 	@Autowired
