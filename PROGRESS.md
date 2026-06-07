@@ -27,7 +27,7 @@
 
 ### 2026-05-28 — Spring Boot modular monolith skeleton
 - `backend/` Maven multi-module project: parent + 5 domain modules + `app`
-- Spring Boot 3.4.1 / Java 21 / Hibernate 6.6 / Kafka / MongoDB / Flyway
+- Spring Boot 3.4.1 / Java 25 / Hibernate 6.6 / Kafka / MongoDB / Flyway
 - `shared-kernel`: `OutboxEntry` JPA entity, `OutboxRepository`, `OutboxRelayService` (polling relay, wired but off by default)
 - `shared-kernel`: `ContentHubArchRules` (published in main — app module executes them)
 - Flyway `V1__initial_schema.sql`: full Postgres DDL from `docs/04` (all tables, indexes, citext extension)
@@ -36,7 +36,7 @@
 - `app/arch/ModuleBoundaryTest`: 5 ArchUnit rules — all pass — enforcing no cross-module DB access (ADR-0009)
 - `app/ApplicationSmokeTest`: Testcontainers smoke test (awaiting Testcontainers 1.21+ for Docker Desktop 4.75 compatibility)
 - `/actuator/health` verified UP in 6s against live docker-compose stack (`SPRING_PROFILES_ACTIVE=dev`)
-- Build: `make backend-build` (requires `JAVA_HOME` → JDK 21; Homebrew openjdk 25 is incompatible with Lombok 1.18.36)
+- Build: `make backend-build` (requires `JAVA_HOME` → JDK 25; Homebrew openjdk 25 is compatible with upgraded Lombok)
 
 ### 2026-05-28 — Local dev stack
 - `docker-compose.yml` — 13 services: Postgres, MongoDB, Kafka + Zookeeper + Schema Registry,
@@ -165,8 +165,8 @@ Start by reading these files in order:
 Then pick up PROGRESS.md §Next and implement it.
 
 Environment notes:
-- Backend build: JAVA_HOME=/Library/Java/JavaVirtualMachines/jdk-21.jdk/Contents/Home (Homebrew openjdk 25 breaks Lombok)
-- Use `make backend-build`, `make backend-test`, `make backend-run` (Makefile pins JDK 21)
+- Backend build: JAVA_HOME=/Library/Java/JavaVirtualMachines/temurin-25.jdk/Contents/Home
+- Use `make backend-build`, `make backend-test`, `make backend-run` (Makefile pins JDK 25)
 - MongoDB URI needs ?authSource=admin (root user is in admin database)
 - Testcontainers smoke test (ApplicationSmokeTest) requires Testcontainers ≥1.21 for Docker Desktop 4.75
 - Frontend: `make frontend-install` then `make frontend-dev` (Vite HMR on :5173, proxies /api → :8080)

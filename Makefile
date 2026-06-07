@@ -13,10 +13,10 @@
 
 COMPOSE     := docker compose
 ENV_FILE    := .env.local
-# macOS ships Homebrew openjdk alongside Oracle JDK 21.
-# Lombok and Spring Boot 3.4 require JDK 21; pin Maven to it explicitly.
-JAVA21_HOME := /Library/Java/JavaVirtualMachines/jdk-21.jdk/Contents/Home
-MAVEN       := JAVA_HOME=$(JAVA21_HOME) mvn
+# macOS ships Homebrew openjdk alongside Oracle JDK 25.
+# Lombok and Spring Boot 3.4 require JDK 25; pin Maven to it explicitly.
+JAVA25_HOME := /Library/Java/JavaVirtualMachines/temurin-25.jdk/Contents/Home
+MAVEN       := JAVA_HOME=$(JAVA25_HOME) mvn
 
 # Load .env.local so Make can reference variables in echo output.
 # The dash suppresses "file not found" — if missing, run: cp .env.local.example .env.local
@@ -58,7 +58,7 @@ doctor:
 		|| { echo "  [!!] docker compose v2 not found — update Docker Desktop"; exit 1; }
 	@command -v java >/dev/null 2>&1 \
 		&& printf "  [ok] java     %s\n" "$$(java -version 2>&1 | head -1 | cut -d'"' -f2)" \
-		|| echo "  [--] java not found  (need JDK 21 — brew install temurin@21)"
+		|| echo "  [--] java not found  (need JDK 25 — brew install temurin@25)"
 	@command -v node >/dev/null 2>&1 \
 		&& printf "  [ok] node     %s\n" "$$(node --version)" \
 		|| echo "  [--] node not found  (need Node 20+ — brew install node@20)"

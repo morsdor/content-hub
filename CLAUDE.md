@@ -10,14 +10,14 @@ performance — all in a browser tab. Full blueprint in `docs/` (14 chapters, 10
 
 ```bash
 # Infrastructure
-make doctor        # check prerequisites (Docker, Java 21, Node 20, Maven)
+make doctor        # check prerequisites (Docker, Java 25, Node 20, Maven)
 make dev-up        # start the full local stack (Postgres, Mongo, Kafka, LocalStack, Jaeger, Grafana)
 make dev-down      # stop containers, keep volumes
 make logs          # tail all container logs  (make logs svc=kafka)
 make clean-force   # wipe all local data volumes
 
 # Backend
-make backend-build  # compile (requires JAVA_HOME → JDK 21)
+make backend-build  # compile (requires JAVA_HOME → JDK 25)
 make backend-test   # run all tests
 make backend-run    # run Spring Boot with profile=dev
 

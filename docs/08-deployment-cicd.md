@@ -80,7 +80,7 @@ jobs:
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 }                                       # SonarCloud needs full history
       - uses: actions/setup-java@v4
-        with: { distribution: temurin, java-version: '21' }
+        with: { distribution: temurin, java-version: '25' }
 
       # ── Quality: style, architecture boundaries, unit tests, coverage ──
       - run: mvn spotless:check                                        # Spotless lint
